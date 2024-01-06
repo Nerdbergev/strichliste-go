@@ -15,16 +15,16 @@ type User struct {
 	Updated  *time.Time
 }
 
-func New(db *sql.DB) UserModel {
-	return UserModel{db: db}
+func NewUserRepository(db *sql.DB) UserRepository {
+	return UserRepository{db: db}
 }
 
-type UserModel struct {
+type UserRepository struct {
 	db *sql.DB
 }
 
-func (m UserModel) All(includeDeleted bool) ([]User, error) {
-	rows, err := m.db.Query("SELECT * FROM user")
+func (r UserRepository) All(includeDeleted bool) ([]User, error) {
+	rows, err := r.db.Query("SELECT * FROM user")
 	if err != nil {
 		return nil, err
 	}
@@ -34,7 +34,6 @@ func (m UserModel) All(includeDeleted bool) ([]User, error) {
 
 	for rows.Next() {
 		var u User
-
 		err := rows.Scan(&u.ID, &u.Name, &u.Email, &u.Balance, &u.Disabled, &u.Created, &u.Updated)
 		if err != nil {
 			return nil, err
@@ -44,9 +43,9 @@ func (m UserModel) All(includeDeleted bool) ([]User, error) {
 	return user, nil
 }
 
-func (m UserModel) CreateUser(u User) (User, error) {
+func (r UserRepository) CreateUser(u User) (User, error) {
 	u.Created = time.Now()
-	res, err := m.db.Exec("INSERT INTO user (name, email, created, balance, disabled, updated) VALUES ($1, $2, $3, 0, false, $4)", u.Name,
+	res, err := r.db.Exec("INSERT INTO user (name, email, created, balance, disabled, updated) VALUES ($1, $2, $3, 0, false, $4)", u.Name,
 		u.Email, u.Created, nil)
 	if err != nil {
 		return User{}, err
@@ -59,11 +58,20 @@ func (m UserModel) CreateUser(u User) (User, error) {
 	return u, nil
 }
 
-func (m UserModel) FindByName(name string) (User, error) {
+func (r UserRepository) FindByName(name string) (User, error) {
+	row := r.db.QueryRow("SELECT * FROM user WHERE name = ?", name)
+	return processRow(row)
+}
+
+func (r UserRepository) FindById(id int64) (User, error) {
+	row := r.db.QueryRow("SELECT * FROM user WHERE id = ?", id)
+	return processRow(row)
+}
+
+func processRow(r *sql.Row) (User, error) {
 	var user User
-	err := m.db.QueryRow("SELECT * FROM user where name = ?", name).
-		Scan(&user.ID, &user.Name, &user.Email, &user.Balance, &user.Disabled, &user.Created,
-			&user.Updated)
+	err := r.Scan(&user.ID, &user.Name, &user.Email, &user.Balance, &user.Disabled, &user.Created,
+		&user.Updated)
 	if err != nil {
 		return User{}, err
 	}

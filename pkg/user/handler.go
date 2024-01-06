@@ -3,24 +3,41 @@ package user
 import (
 	"errors"
 	"net/http"
+	"strconv"
 	"time"
 
+	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/render"
 	"github.com/nerdbergev/shoppinglist-go/pkg/user/model"
 )
 
 type Handler struct {
-	um model.UserModel
+	ur model.UserRepository
 }
 
-func NewHandler(um model.UserModel) Handler {
+func NewHandler(ur model.UserRepository) Handler {
 	return Handler{
-		um: um,
+		ur: ur,
 	}
 }
 
-func (h Handler) GetUsers(w http.ResponseWriter, r *http.Request) {
-	u, err := h.um.All(false)
+func (h Handler) FindById(w http.ResponseWriter, r *http.Request) {
+	idParam := chi.URLParam(r, "id")
+	id, err := strconv.ParseInt(idParam, 10, 64)
+	if err != nil {
+		_ = render.Render(w, r, ErrRender(err))
+		return
+	}
+	user, err := h.ur.FindById(id)
+	if err != nil {
+		_ = render.Render(w, r, ErrRender(err))
+		return
+	}
+	_ = render.Render(w, r, NewUserResponse(user))
+}
+
+func (h Handler) GetAll(w http.ResponseWriter, r *http.Request) {
+	u, err := h.ur.All(false)
 	if err != nil {
 		_ = render.Render(w, r, ErrRender(err))
 		return
@@ -38,7 +55,7 @@ func (h Handler) CreateUser(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	created, err := h.um.CreateUser(model.User{Name: data.Name})
+	created, err := h.ur.CreateUser(model.User{Name: data.Name})
 	if err != nil {
 		_ = render.Render(w, r, ErrRender(err))
 	}

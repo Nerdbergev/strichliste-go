@@ -39,9 +39,9 @@ func main() {
 	sm := settings.NewModel(yml)
 	sh := settings.NewHandler(sm)
 
-	um := model.New(db)
+	ur := model.NewUserRepository(db)
 
-	uh := user.NewHandler(um)
+	uh := user.NewHandler(ur)
 	r.Use(middleware.RequestID)
 	r.Use(middleware.Logger)
 	r.Use(middleware.Recoverer)
@@ -49,8 +49,11 @@ func main() {
 	r.Use(render.SetContentType(render.ContentTypeJSON))
 
 	r.Route("/api", func(r chi.Router) {
-		r.Get("/user", uh.GetUsers)
-		r.Post("/user", uh.CreateUser)
+		r.Route("/user", func(r chi.Router) {
+			r.Get("/", uh.GetAll)
+			r.Get("/{id}", uh.FindById)
+			r.Post("/", uh.CreateUser)
+		})
 		r.Get("/settings", sh.GetSettings)
 	})
 
