@@ -1,4 +1,4 @@
-package user
+package users
 
 import (
 	"errors"
@@ -8,7 +8,7 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/render"
-	"github.com/nerdbergev/shoppinglist-go/pkg/user/model"
+	"github.com/nerdbergev/shoppinglist-go/pkg/users/model"
 )
 
 type Handler struct {
@@ -79,25 +79,25 @@ func (ur UserListResponse) Render(w http.ResponseWriter, r *http.Request) error 
 }
 
 type User struct {
-	ID       int64      `json:"id"`
-	Name     string     `json:"name"`
-	Email    string     `json:"email"`
-	Balance  int        `json:"balance"`
-	Active   bool       `json:"isActive"`
-	Disabled bool       `json:"isDisabled"`
-	Created  time.Time  `json:"created"`
-	Updated  *time.Time `json:"updated"`
+	ID         int64      `json:"id"`
+	Name       string     `json:"name"`
+	Email      string     `json:"email"`
+	Balance    int        `json:"balance"`
+	IsActive   bool       `json:"isActive"`
+	IsDisabled bool       `json:"isDisabled"`
+	Created    time.Time  `json:"created"`
+	Updated    *time.Time `json:"updated"`
 }
 
 func MapUser(u model.User) User {
 	resp := User{
-		ID:       u.ID,
-		Name:     u.Name,
-		Email:    u.Email,
-		Balance:  u.Balance,
-		Disabled: u.Disabled,
-		Created:  u.Created,
-		Updated:  u.Updated,
+		ID:         u.ID,
+		Name:       u.Name,
+		Email:      u.Email,
+		Balance:    u.Balance,
+		IsDisabled: u.Disabled,
+		Created:    u.Created,
+		Updated:    u.Updated,
 	}
 	return resp
 }

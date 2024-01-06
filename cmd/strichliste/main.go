@@ -10,8 +10,10 @@ import (
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/go-chi/render"
 	"github.com/nerdbergev/shoppinglist-go/pkg/settings"
-	"github.com/nerdbergev/shoppinglist-go/pkg/user"
-	"github.com/nerdbergev/shoppinglist-go/pkg/user/model"
+	"github.com/nerdbergev/shoppinglist-go/pkg/transactions"
+	txnModel "github.com/nerdbergev/shoppinglist-go/pkg/transactions/model"
+	"github.com/nerdbergev/shoppinglist-go/pkg/users"
+	"github.com/nerdbergev/shoppinglist-go/pkg/users/model"
 	"gopkg.in/yaml.v3"
 
 	_ "github.com/mattn/go-sqlite3"
@@ -40,8 +42,11 @@ func main() {
 	sh := settings.NewHandler(sm)
 
 	ur := model.NewUserRepository(db)
+	uh := users.NewHandler(ur)
 
-	uh := user.NewHandler(ur)
+	tr := txnModel.NewUserRepository(db)
+	th := transactions.NewHandler(tr)
+
 	r.Use(middleware.RequestID)
 	r.Use(middleware.Logger)
 	r.Use(middleware.Recoverer)
@@ -52,6 +57,7 @@ func main() {
 		r.Route("/user", func(r chi.Router) {
 			r.Get("/", uh.GetAll)
 			r.Get("/{id}", uh.FindById)
+			r.Get("/{id}/transaction", th.GetUserTransactions)
 			r.Post("/", uh.CreateUser)
 		})
 		r.Get("/settings", sh.GetSettings)
