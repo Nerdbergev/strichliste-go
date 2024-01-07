@@ -2,6 +2,7 @@ package main
 
 import (
 	"database/sql"
+	"fmt"
 	"log"
 	"net/http"
 	"os"
@@ -38,7 +39,9 @@ func main() {
 		log.Fatal(err)
 	}
 
-	sm := settings.NewModel(yml)
+	log.Println(yml)
+	sm := settings.NewService(yml)
+	fmt.Println(sm.Get("user.stalePeriod"))
 	sh := settings.NewHandler(sm)
 
 	ur := model.NewUserRepository(db)
@@ -57,7 +60,10 @@ func main() {
 		r.Route("/user", func(r chi.Router) {
 			r.Get("/", uh.GetAll)
 			r.Get("/{id}", uh.FindById)
-			r.Get("/{id}/transaction", th.GetUserTransactions)
+			r.Route("/{id}/transaction", func(r chi.Router) {
+				r.Get("/", th.GetUserTransactions)
+				r.Post("/", th.CreateTransaction)
+			})
 			r.Post("/", uh.CreateUser)
 		})
 		r.Get("/settings", sh.GetSettings)

@@ -3,6 +3,7 @@ package users
 import (
 	"errors"
 	"net/http"
+	"sort"
 	"strconv"
 	"time"
 
@@ -37,13 +38,39 @@ func (h Handler) FindById(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h Handler) GetAll(w http.ResponseWriter, r *http.Request) {
-	u, err := h.ur.All(false)
+	activeParam := r.URL.Query().Get("active")
+	var (
+		users []model.User
+		err   error
+	)
+	if activeParam == "" {
+		users, err = h.ur.AllUsers()
+		if err != nil {
+			_ = render.Render(w, r, ErrRender(err))
+			return
+		}
+	} else {
+		isActive, perr := strconv.ParseBool(activeParam)
+		if perr != nil {
+			_ = render.Render(w, r, ErrRender(perr))
+			return
+		}
+		if isActive {
+			users, err = h.ur.AllActive()
+		} else {
+			users, err = h.ur.AllInactive()
+		}
+	}
 	if err != nil {
 		_ = render.Render(w, r, ErrRender(err))
 		return
 	}
 
-	if err := render.Render(w, r, NewUserListResponse(u)); err != nil {
+	sort.Slice(users, func(i, j int) bool {
+		return users[i].Name < users[j].Name
+	})
+
+	if err := render.Render(w, r, NewUserListResponse(users)); err != nil {
 		_ = render.Render(w, r, ErrRender(err))
 	}
 }

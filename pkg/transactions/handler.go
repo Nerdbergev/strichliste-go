@@ -21,18 +21,53 @@ func NewHandler(tr model.TransactionRepository) Handler {
 }
 
 func (h Handler) GetUserTransactions(w http.ResponseWriter, r *http.Request) {
-	idParam := chi.URLParam(r, "id")
-	id, err := strconv.ParseInt(idParam, 10, 64)
+	uidParam := chi.URLParam(r, "id")
+	uid, err := strconv.ParseInt(uidParam, 10, 64)
 	if err != nil {
 		_ = render.Render(w, r, ErrRender(err))
 		return
 	}
-	ts, err := h.tr.GetFromUser(id)
+	ts, err := h.tr.GetFromUser(uid)
 	if err != nil {
 		_ = render.Render(w, r, ErrRender(err))
 		return
 	}
 	_ = render.Render(w, r, NewTransactionListResponse(ts))
+}
+
+func (h Handler) CreateTransaction(w http.ResponseWriter, r *http.Request) {
+	uidParam := chi.URLParam(r, "id")
+	uid, err := strconv.ParseInt(uidParam, 10, 64)
+	if err != nil {
+		_ = render.Render(w, r, ErrRender(err))
+		return
+	}
+
+	data := &TransactionRequest{}
+	if err := render.Bind(r, data); err != nil {
+		_ = render.Render(w, r, ErrRender(err))
+		return
+	}
+
+	tr, err := h.tr.Deposit(uid, data.Amount)
+	if err != nil {
+		_ = render.Render(w, r, ErrRender(err))
+		return
+	}
+	_ = render.Render(w, r, NewTransactionResponse(tr))
+
+}
+
+func NewTransactionResponse(t model.Transaction) TransactionResponse {
+	return TransactionResponse{Transaction: MapTransaction(t)}
+}
+
+type TransactionResponse struct {
+	Transaction Transaction `json:"transaction"`
+}
+
+func (tr TransactionResponse) Render(w http.ResponseWriter, r *http.Request) error {
+	return nil
 }
 
 func NewTransactionListResponse(ts []model.Transaction) TransactionListResponse {
@@ -55,16 +90,25 @@ func (tr TransactionListResponse) Render(w http.ResponseWriter, r *http.Request)
 
 func MapTransaction(t model.Transaction) Transaction {
 	resp := Transaction{
-		ID:          t.ID,
-		User:        MapUser(t.User),
-		ArticleID:   t.ArticleID,
-		RecipientID: t.RecipientID,
-		SenderID:    t.SenderID,
-		Quantity:    t.Quantity,
-		Comment:     t.Comment,
-		Amount:      t.Amount,
-		IsDeleted:   t.IsDeleted,
-		Created:     t.Created,
+		ID:        t.ID,
+		User:      MapUser(t.User),
+		Comment:   t.Comment.String,
+		Amount:    t.Amount,
+		IsDeleted: t.IsDeleted,
+		Created:   t.Created.Format("2006-01-02 15:04:05"),
+	}
+
+	if t.ArticleID.Valid {
+		resp.ArticleID = &t.ArticleID.Int64
+	}
+	if t.RecipientID.Valid {
+		resp.RecipientID = &t.RecipientID.Int64
+	}
+	if t.SenderID.Valid {
+		resp.SenderID = &t.SenderID.Int64
+	}
+	if t.Quantity.Valid {
+		resp.Quantity = &t.Quantity.Int64
 	}
 	return resp
 }
@@ -83,17 +127,17 @@ func MapUser(u model.User) User {
 }
 
 type Transaction struct {
-	ID           int64     `json:"id"`
-	User         User      `json:"user"`
-	ArticleID    int64     `json:"article_id"`
-	RecipientID  int64     `json:"recipient"`
-	SenderID     int64     `json:"sender"`
-	Quantity     int64     `json:"quantity"`
-	Comment      string    `json:"comment"`
-	Amount       int64     `json:"amount"`
-	IsDeleted    bool      `json:"isDeleted"`
-	IsDeleteable bool      `json:"isDeletable"`
-	Created      time.Time `json:"created"`
+	ID           int64  `json:"id"`
+	User         User   `json:"user"`
+	ArticleID    *int64 `json:"article_id"`
+	RecipientID  *int64 `json:"recipient"`
+	SenderID     *int64 `json:"sender"`
+	Quantity     *int64 `json:"quantity"`
+	Comment      string `json:"comment"`
+	Amount       int64  `json:"amount"`
+	IsDeleted    bool   `json:"isDeleted"`
+	IsDeleteable bool   `json:"isDeletable"`
+	Created      string `json:"created"`
 }
 
 type User struct {
@@ -128,4 +172,12 @@ func ErrRender(err error) render.Renderer {
 		StatusText:     "Error rendering response.",
 		ErrorText:      err.Error(),
 	}
+}
+
+type TransactionRequest struct {
+	Amount int64 `json:"amount"`
+}
+
+func (u TransactionRequest) Bind(r *http.Request) error {
+	return nil
 }

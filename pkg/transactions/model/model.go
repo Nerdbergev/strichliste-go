@@ -43,14 +43,30 @@ func (r TransactionRepository) GetFromUser(userID int64) ([]Transaction, error) 
 	return transactions, nil
 }
 
+func (r TransactionRepository) Deposit(userID, amount int64) (Transaction, error) {
+	t := Transaction{}
+	t.Created = time.Now()
+	query := `INSERT INTO transactions (amount, user_id, created, deleted) VALUES ($1, $2, $3, false)`
+	res, err := r.db.Exec(query, amount, userID, t.Created)
+	if err != nil {
+		return Transaction{}, err
+	}
+	t.ID, err = res.LastInsertId()
+	if err != nil {
+		return Transaction{}, err
+	}
+
+	return t, nil
+}
+
 type Transaction struct {
 	ID          int64
 	User        User
-	ArticleID   int64
-	RecipientID int64
-	SenderID    int64
-	Quantity    int64
-	Comment     string
+	ArticleID   sql.NullInt64
+	RecipientID sql.NullInt64
+	SenderID    sql.NullInt64
+	Quantity    sql.NullInt64
+	Comment     sql.NullString
 	Amount      int64
 	IsDeleted   bool
 	Created     time.Time

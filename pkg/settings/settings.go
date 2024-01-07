@@ -1,32 +1,42 @@
 package settings
 
 import (
+	"fmt"
 	"net/http"
+	"strings"
 
 	"github.com/go-chi/render"
 )
 
-func NewModel(m map[string]any) Model {
+func NewService(m map[string]any) Service {
 	nm := map[string]any{
 		"settings": m["parameters"].(map[string]any)["strichliste"],
 	}
-	return Model{m: nm}
+	return Service{m: nm}
 }
 
-type Model struct {
+type Service struct {
 	m map[string]any
 }
 
-func (sm Model) Get(k string) any {
-	return sm.m[k]
+func (sm Service) Get(k string) any {
+	parts := strings.Split(k, ".")
+
+	var m map[string]any = sm.m["settings"].(map[string]any)
+	for _, p := range parts[:len(parts)-1] {
+		fmt.Println(p)
+		m = m[p].(map[string]any)
+	}
+
+	return m[parts[len(parts)-1]]
 }
 
 type Handler struct {
-	settings Model
+	settings Service
 }
 
-func NewHandler(sm Model) Handler {
-	return Handler{settings: sm}
+func NewHandler(svc Service) Handler {
+	return Handler{settings: svc}
 }
 
 func (h Handler) GetSettings(w http.ResponseWriter, r *http.Request) {

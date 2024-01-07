@@ -23,7 +23,7 @@ type UserRepository struct {
 	db *sql.DB
 }
 
-func (r UserRepository) All(includeDeleted bool) ([]User, error) {
+func (r UserRepository) AllUsers() ([]User, error) {
 	rows, err := r.db.Query("SELECT * FROM user")
 	if err != nil {
 		return nil, err
@@ -31,7 +31,44 @@ func (r UserRepository) All(includeDeleted bool) ([]User, error) {
 	defer rows.Close()
 
 	var user []User
+	for rows.Next() {
+		var u User
+		err := rows.Scan(&u.ID, &u.Name, &u.Email, &u.Balance, &u.Disabled, &u.Created, &u.Updated)
+		if err != nil {
+			return nil, err
+		}
+		user = append(user, u)
+	}
+	return user, nil
+}
 
+func (r UserRepository) AllActive() ([]User, error) {
+	rows, err := r.db.Query("SELECT * FROM user")
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var user []User
+	for rows.Next() {
+		var u User
+		err := rows.Scan(&u.ID, &u.Name, &u.Email, &u.Balance, &u.Disabled, &u.Created, &u.Updated)
+		if err != nil {
+			return nil, err
+		}
+		user = append(user, u)
+	}
+	return user, nil
+}
+
+func (r UserRepository) AllInactive() ([]User, error) {
+	rows, err := r.db.Query("SELECT * FROM user")
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var user []User
 	for rows.Next() {
 		var u User
 		err := rows.Scan(&u.ID, &u.Name, &u.Email, &u.Balance, &u.Disabled, &u.Created, &u.Updated)
