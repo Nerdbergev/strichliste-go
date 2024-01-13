@@ -1,7 +1,6 @@
 package settings
 
 import (
-	"fmt"
 	"net/http"
 	"strings"
 
@@ -24,7 +23,6 @@ func (sm Service) Get(k string) any {
 
 	var m map[string]any = sm.m["settings"].(map[string]any)
 	for _, p := range parts[:len(parts)-1] {
-		fmt.Println(p)
 		m = m[p].(map[string]any)
 	}
 

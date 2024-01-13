@@ -1,22 +1,25 @@
-package transactions
+package rest
 
 import (
+	"errors"
 	"net/http"
 	"strconv"
 	"time"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/render"
-	"github.com/nerdbergev/shoppinglist-go/pkg/transactions/model"
+	"github.com/nerdbergev/shoppinglist-go/pkg/transactions"
+	"github.com/nerdbergev/shoppinglist-go/pkg/transactions/domain"
+	udomain "github.com/nerdbergev/shoppinglist-go/pkg/users/domain"
 )
 
 type Handler struct {
-	tr model.TransactionRepository
+	svc transactions.Service
 }
 
-func NewHandler(tr model.TransactionRepository) Handler {
+func NewHandler(svc transactions.Service) Handler {
 	return Handler{
-		tr: tr,
+		svc: svc,
 	}
 }
 
@@ -27,7 +30,14 @@ func (h Handler) GetUserTransactions(w http.ResponseWriter, r *http.Request) {
 		_ = render.Render(w, r, ErrRender(err))
 		return
 	}
-	ts, err := h.tr.GetFromUser(uid)
+
+	comment := r.URL.Query().Get("comment")
+	if len(comment) > 255 {
+		_ = render.Render(w, r, ErrRender(errors.New("comment invalid")))
+		return
+	}
+
+	ts, err := h.svc.GetFromUser(uid)
 	if err != nil {
 		_ = render.Render(w, r, ErrRender(err))
 		return
@@ -36,8 +46,7 @@ func (h Handler) GetUserTransactions(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h Handler) CreateTransaction(w http.ResponseWriter, r *http.Request) {
-	uidParam := chi.URLParam(r, "id")
-	uid, err := strconv.ParseInt(uidParam, 10, 64)
+	_, err := parseInt64(chi.URLParam(r, "id"))
 	if err != nil {
 		_ = render.Render(w, r, ErrRender(err))
 		return
@@ -49,16 +58,16 @@ func (h Handler) CreateTransaction(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	tr, err := h.tr.Deposit(uid, data.Amount)
-	if err != nil {
-		_ = render.Render(w, r, ErrRender(err))
-		return
-	}
-	_ = render.Render(w, r, NewTransactionResponse(tr))
+	// tr, err := h.svc.ProcessTransaction(uid, data.Amount, "", nil, nil, nil)
+	// if err != nil {
+	// _ = render.Render(w, r, ErrRender(err))
+	// return
+	// }
+	// _ = render.Render(w, r, NewTransactionResponse(tr))
 
 }
 
-func NewTransactionResponse(t model.Transaction) TransactionResponse {
+func NewTransactionResponse(t domain.Transaction) TransactionResponse {
 	return TransactionResponse{Transaction: MapTransaction(t)}
 }
 
@@ -70,7 +79,7 @@ func (tr TransactionResponse) Render(w http.ResponseWriter, r *http.Request) err
 	return nil
 }
 
-func NewTransactionListResponse(ts []model.Transaction) TransactionListResponse {
+func NewTransactionListResponse(ts []domain.Transaction) TransactionListResponse {
 	list := TransactionListResponse{Transactions: []Transaction{}}
 	for _, t := range ts {
 		list.Transactions = append(list.Transactions, MapTransaction(t))
@@ -88,40 +97,46 @@ func (tr TransactionListResponse) Render(w http.ResponseWriter, r *http.Request)
 	return nil
 }
 
-func MapTransaction(t model.Transaction) Transaction {
+func MapTransaction(t domain.Transaction) Transaction {
+
 	resp := Transaction{
 		ID:        t.ID,
 		User:      MapUser(t.User),
-		Comment:   t.Comment.String,
 		Amount:    t.Amount,
 		IsDeleted: t.IsDeleted,
 		Created:   t.Created.Format("2006-01-02 15:04:05"),
 	}
+	if t.Comment != nil {
+		resp.Comment = *t.Comment
+	}
 
-	if t.ArticleID.Valid {
-		resp.ArticleID = &t.ArticleID.Int64
+	if t.Article != nil {
+		resp.ArticleID = &t.Article.ID
 	}
-	if t.RecipientID.Valid {
-		resp.RecipientID = &t.RecipientID.Int64
+	if t.Recipient != nil {
+		resp.RecipientID = &t.Recipient.ID
 	}
-	if t.SenderID.Valid {
-		resp.SenderID = &t.SenderID.Int64
+	if t.Sender != nil {
+		resp.SenderID = &t.Sender.ID
 	}
-	if t.Quantity.Valid {
-		resp.Quantity = &t.Quantity.Int64
+	if t.Quantity != nil {
+		resp.Quantity = t.Quantity
 	}
 	return resp
 }
 
-func MapUser(u model.User) User {
+func MapUser(u udomain.User) User {
 	resp := User{
-		ID:         u.ID,
-		Name:       u.Name,
-		Email:      u.Email,
-		Balance:    u.Balance,
-		IsDisabled: u.Disabled,
-		Created:    u.Created,
-		Updated:    u.Updated,
+		ID:      u.ID,
+		Name:    u.Name,
+		Balance: u.Balance,
+		// IsDisabled: u.Disabled,
+		Created: u.Created,
+		Updated: u.Updated,
+	}
+
+	if u.Email != nil {
+		resp.Email = *u.Email
 	}
 	return resp
 }
@@ -144,7 +159,7 @@ type User struct {
 	ID         int64      `json:"id"`
 	Name       string     `json:"name"`
 	Email      string     `json:"email"`
-	Balance    int        `json:"balance"`
+	Balance    int64      `json:"balance"`
 	IsActive   bool       `json:"isActive"`
 	IsDisabled bool       `json:"isDisabled"`
 	Created    time.Time  `json:"created"`
@@ -175,9 +190,20 @@ func ErrRender(err error) render.Renderer {
 }
 
 type TransactionRequest struct {
-	Amount int64 `json:"amount"`
+	Amount      int64  `json:"amount"`
+	Quantity    *int64 `json:"quantity"`
+	Comment     string `json:"comment"`
+	RecipientID *int64 `json:"recipientId"`
+	ArticleID   *int64 `json:"articleId"`
 }
 
 func (u TransactionRequest) Bind(r *http.Request) error {
+	if len(u.Comment) > 255 {
+		return errors.New("invalid comment")
+	}
 	return nil
+}
+
+func parseInt64(s string) (int64, error) {
+	return strconv.ParseInt(s, 10, 64)
 }

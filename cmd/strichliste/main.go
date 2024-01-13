@@ -2,7 +2,6 @@ package main
 
 import (
 	"database/sql"
-	"fmt"
 	"log"
 	"net/http"
 	"os"
@@ -12,9 +11,11 @@ import (
 	"github.com/go-chi/render"
 	"github.com/nerdbergev/shoppinglist-go/pkg/settings"
 	"github.com/nerdbergev/shoppinglist-go/pkg/transactions"
-	txnModel "github.com/nerdbergev/shoppinglist-go/pkg/transactions/model"
+	trepo "github.com/nerdbergev/shoppinglist-go/pkg/transactions/repository"
+	trest "github.com/nerdbergev/shoppinglist-go/pkg/transactions/rest"
 	"github.com/nerdbergev/shoppinglist-go/pkg/users"
-	"github.com/nerdbergev/shoppinglist-go/pkg/users/model"
+	urepo "github.com/nerdbergev/shoppinglist-go/pkg/users/repository"
+	urest "github.com/nerdbergev/shoppinglist-go/pkg/users/rest"
 	"gopkg.in/yaml.v3"
 
 	_ "github.com/mattn/go-sqlite3"
@@ -39,16 +40,19 @@ func main() {
 		log.Fatal(err)
 	}
 
-	log.Println(yml)
 	sm := settings.NewService(yml)
-	fmt.Println(sm.Get("user.stalePeriod"))
 	sh := settings.NewHandler(sm)
 
-	ur := model.NewUserRepository(db)
-	uh := users.NewHandler(ur)
+	ur := urepo.New(db)
+	usvc, err := users.NewService(sm, ur)
+	if err != nil {
+		log.Fatal(err)
+	}
+	uh := urest.NewHandler(usvc)
 
-	tr := txnModel.NewUserRepository(db)
-	th := transactions.NewHandler(tr)
+	tr := trepo.New(db)
+	tsvc := transactions.NewService(tr)
+	th := trest.NewHandler(tsvc)
 
 	r.Use(middleware.RequestID)
 	r.Use(middleware.Logger)

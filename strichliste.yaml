@@ -14,8 +14,7 @@ parameters:
             fee: 0
 
         user:
-            # See http://de.php.net/manual/en/datetime.formats.relative.php
-            stalePeriod: '10 day'
+            stalePeriod: '240h' # 240 hours = 10 days
 
         i18n:
             dateFormat: 'YYYY-MM-DD HH:mm:ss'

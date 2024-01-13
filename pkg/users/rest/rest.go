@@ -1,4 +1,4 @@
-package users
+package rest
 
 import (
 	"errors"
@@ -9,16 +9,17 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/render"
-	"github.com/nerdbergev/shoppinglist-go/pkg/users/model"
+	"github.com/nerdbergev/shoppinglist-go/pkg/users"
+	"github.com/nerdbergev/shoppinglist-go/pkg/users/domain"
 )
 
 type Handler struct {
-	ur model.UserRepository
+	svc users.Service
 }
 
-func NewHandler(ur model.UserRepository) Handler {
+func NewHandler(svc users.Service) Handler {
 	return Handler{
-		ur: ur,
+		svc: svc,
 	}
 }
 
@@ -29,7 +30,8 @@ func (h Handler) FindById(w http.ResponseWriter, r *http.Request) {
 		_ = render.Render(w, r, ErrRender(err))
 		return
 	}
-	user, err := h.ur.FindById(id)
+
+	user, err := h.svc.FindById(id)
 	if err != nil {
 		_ = render.Render(w, r, ErrRender(err))
 		return
@@ -37,14 +39,22 @@ func (h Handler) FindById(w http.ResponseWriter, r *http.Request) {
 	_ = render.Render(w, r, NewUserResponse(user))
 }
 
+type getAllRequest struct {
+	active bool
+}
+
+func (req getAllRequest) Active() bool {
+	return req.active
+}
+
 func (h Handler) GetAll(w http.ResponseWriter, r *http.Request) {
 	activeParam := r.URL.Query().Get("active")
 	var (
-		users []model.User
+		users []domain.User
 		err   error
 	)
 	if activeParam == "" {
-		users, err = h.ur.AllUsers()
+		users, err = h.svc.GetAll()
 		if err != nil {
 			_ = render.Render(w, r, ErrRender(err))
 			return
@@ -55,11 +65,7 @@ func (h Handler) GetAll(w http.ResponseWriter, r *http.Request) {
 			_ = render.Render(w, r, ErrRender(perr))
 			return
 		}
-		if isActive {
-			users, err = h.ur.AllActive()
-		} else {
-			users, err = h.ur.AllInactive()
-		}
+		users, err = h.svc.FindByState(getAllRequest{active: isActive})
 	}
 	if err != nil {
 		_ = render.Render(w, r, ErrRender(err))
@@ -76,21 +82,21 @@ func (h Handler) GetAll(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h Handler) CreateUser(w http.ResponseWriter, r *http.Request) {
-	data := &UserRequest{}
-	if err := render.Bind(r, data); err != nil {
+	uReq := &UserRequest{}
+	if err := render.Bind(r, uReq); err != nil {
 		_ = render.Render(w, r, ErrInvalidRequest(err))
 		return
 	}
 
-	created, err := h.ur.CreateUser(model.User{Name: data.Name})
+	created, err := h.svc.CreateUser(uReq)
 	if err != nil {
 		_ = render.Render(w, r, ErrRender(err))
 	}
 	render.JSON(w, r, NewUserResponse(created))
 }
 
-func NewUserListResponse(users []model.User) UserListResponse {
-	list := UserListResponse{}
+func NewUserListResponse(users []domain.User) UserListResponse {
+	list := UserListResponse{Users: []User{}}
 	for _, u := range users {
 		list.Users = append(list.Users, MapUser(u))
 	}
@@ -109,27 +115,29 @@ type User struct {
 	ID         int64      `json:"id"`
 	Name       string     `json:"name"`
 	Email      string     `json:"email"`
-	Balance    int        `json:"balance"`
+	Balance    int64      `json:"balance"`
 	IsActive   bool       `json:"isActive"`
 	IsDisabled bool       `json:"isDisabled"`
 	Created    time.Time  `json:"created"`
 	Updated    *time.Time `json:"updated"`
 }
 
-func MapUser(u model.User) User {
+func MapUser(u domain.User) User {
 	resp := User{
 		ID:         u.ID,
 		Name:       u.Name,
-		Email:      u.Email,
 		Balance:    u.Balance,
-		IsDisabled: u.Disabled,
+		IsDisabled: u.IsDisabled,
 		Created:    u.Created,
 		Updated:    u.Updated,
+	}
+	if u.Email != nil {
+		resp.Email = *u.Email
 	}
 	return resp
 }
 
-func NewUserResponse(u model.User) UserResponse {
+func NewUserResponse(u domain.User) UserResponse {
 	return UserResponse{User: MapUser(u)}
 }
 
@@ -174,14 +182,33 @@ func ErrRender(err error) render.Renderer {
 }
 
 type UserRequest struct {
-	Name  string `json:"name"`
-	Email string `json:"email"`
+	NameParam  string  `json:"name"`
+	EmailParam *string `json:"email"`
+	hasMail    bool
 }
 
 func (u *UserRequest) Bind(r *http.Request) error {
-	if u.Name == "" {
+	if u.NameParam == "" {
 		return errors.New("missing required User fields.")
+	}
+	if u.EmailParam != nil {
+		u.hasMail = true
 	}
 
 	return nil
+}
+
+func (u UserRequest) Name() string {
+	return u.NameParam
+}
+
+func (u UserRequest) Email() string {
+	if u.hasMail {
+		return *u.EmailParam
+	}
+	return ""
+}
+
+func (u UserRequest) HasEmail() bool {
+	return u.hasMail
 }
