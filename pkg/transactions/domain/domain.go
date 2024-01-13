@@ -1,6 +1,7 @@
 package domain
 
 import (
+	"context"
 	"time"
 
 	adomain "github.com/nerdbergev/shoppinglist-go/pkg/articles/domain"
@@ -21,6 +22,7 @@ type Transaction struct {
 }
 
 type TransactionRepository interface {
+	Transaction(context.Context, func(context.Context) error) error
 	GetAll() ([]Transaction, error)
 	StoreTransaction(Transaction) (Transaction, error)
 	FindByUserId(int64) ([]Transaction, error)

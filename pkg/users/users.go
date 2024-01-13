@@ -1,6 +1,7 @@
 package users
 
 import (
+	"context"
 	"errors"
 	"time"
 
@@ -63,7 +64,7 @@ func (svc Service) CreateUser(req CreateUserRequest) (domain.User, error) {
 }
 
 func (svc Service) FindById(uid int64) (domain.User, error) {
-	return svc.repo.FindById(uid)
+	return svc.repo.FindById(context.TODO(), uid)
 }
 
 func (svc Service) GetStaleDateTime() time.Time {

@@ -51,7 +51,7 @@ func main() {
 	uh := urest.NewHandler(usvc)
 
 	tr := trepo.New(db)
-	tsvc := transactions.NewService(tr)
+	tsvc := transactions.NewService(tr, ur)
 	th := trest.NewHandler(tsvc)
 
 	r.Use(middleware.RequestID)

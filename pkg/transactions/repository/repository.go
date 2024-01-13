@@ -1,10 +1,12 @@
 package repository
 
 import (
+	"context"
 	"database/sql"
 	"errors"
 	"time"
 
+	"github.com/nerdbergev/shoppinglist-go/pkg/database"
 	"github.com/nerdbergev/shoppinglist-go/pkg/transactions/domain"
 	udomain "github.com/nerdbergev/shoppinglist-go/pkg/users/domain"
 )
@@ -40,7 +42,7 @@ func (r TransactionRepository) FindByUserId(userID int64) ([]domain.Transaction,
 		var t Transaction
 		var u User
 		err := rows.Scan(&t.ID, &t.ArticleID, &t.RecipientID, &t.SenderID, &t.Quantity, &t.Comment,
-			&t.Amount, &t.IsDeleted, &t.Created, &u.ID, &u.Name, &u.Email, &u.Balance, &u.Disabled,
+			&t.Amount, &t.IsDeleted, &t.Created, &u.ID, &u.Name, &u.Email, &u.Balance, &u.IsDisabled,
 			&u.Created, &u.Updated)
 		if err != nil {
 			return nil, err
@@ -50,6 +52,21 @@ func (r TransactionRepository) FindByUserId(userID int64) ([]domain.Transaction,
 	}
 
 	return transactions, nil
+}
+
+func (r TransactionRepository) Transaction(ctx context.Context, f func(ctx context.Context) error) error {
+	tx, err := r.db.Begin()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+
+	err = f(database.AddToContext(ctx, tx))
+	if err != nil {
+		return err
+	}
+
+	return tx.Commit()
 }
 
 func (r TransactionRepository) ProcessTransaction(userID, amount int64, comment string, quantity, articleID, recipientID *int64) (domain.Transaction, error) {
@@ -158,7 +175,7 @@ func (r TransactionRepository) persistUserBalance(tx *sql.Tx, user User) error {
 
 func processUserRow(r *sql.Row) (User, error) {
 	var user User
-	err := r.Scan(&user.ID, &user.Name, &user.Email, &user.Balance, &user.Disabled, &user.Created,
+	err := r.Scan(&user.ID, &user.Name, &user.Email, &user.Balance, &user.IsDisabled, &user.Created,
 		&user.Updated)
 	return user, err
 }

@@ -46,7 +46,7 @@ func (h Handler) GetUserTransactions(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h Handler) CreateTransaction(w http.ResponseWriter, r *http.Request) {
-	_, err := parseInt64(chi.URLParam(r, "id"))
+	uid, err := parseInt64(chi.URLParam(r, "id"))
 	if err != nil {
 		_ = render.Render(w, r, ErrRender(err))
 		return
@@ -58,13 +58,12 @@ func (h Handler) CreateTransaction(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// tr, err := h.svc.ProcessTransaction(uid, data.Amount, "", nil, nil, nil)
-	// if err != nil {
-	// _ = render.Render(w, r, ErrRender(err))
-	// return
-	// }
-	// _ = render.Render(w, r, NewTransactionResponse(tr))
-
+	tr, err := h.svc.ProcessTransaction(uid, data.Amount, nil, nil, nil, nil)
+	if err != nil {
+		_ = render.Render(w, r, ErrRender(err))
+		return
+	}
+	_ = render.Render(w, r, NewTransactionResponse(tr))
 }
 
 func NewTransactionResponse(t domain.Transaction) TransactionResponse {

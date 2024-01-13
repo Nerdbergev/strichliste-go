@@ -1,6 +1,9 @@
 package domain
 
-import "time"
+import (
+	"context"
+	"time"
+)
 
 type User struct {
 	ID         int64
@@ -17,7 +20,7 @@ type UserRepository interface {
 	GetAll() ([]User, error)
 	FindActive(time.Time) ([]User, error)
 	FindInactive(time.Time) ([]User, error)
-	FindById(int64) (User, error)
+	FindById(context.Context, int64) (User, error)
 	StoreUser(User) (User, error)
 	UpdateUser(User) error
 	DeleteById(int64) error

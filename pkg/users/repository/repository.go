@@ -1,9 +1,11 @@
 package repository
 
 import (
+	"context"
 	"database/sql"
 	"time"
 
+	"github.com/nerdbergev/shoppinglist-go/pkg/database"
 	"github.com/nerdbergev/shoppinglist-go/pkg/users/domain"
 )
 
@@ -110,8 +112,8 @@ func (r Repository) FindByName(name string) (domain.User, error) {
 	return processRow(row)
 }
 
-func (r Repository) FindById(id int64) (domain.User, error) {
-	row := r.db.QueryRow("SELECT * FROM user WHERE id = ?", id)
+func (r Repository) FindById(ctx context.Context, id int64) (domain.User, error) {
+	row := r.getDB(ctx).QueryRow("SELECT * FROM user WHERE id = ?", id)
 	return processRow(row)
 }
 
@@ -121,6 +123,17 @@ func (r Repository) UpdateUser(domain.User) error {
 
 func (r Repository) DeleteById(int64) error {
 	return nil
+}
+
+type DB interface {
+	QueryRow(string, ...any) *sql.Row
+}
+
+func (r Repository) getDB(ctx context.Context) DB {
+	if db, ok := database.FromContext(ctx); ok {
+		return db
+	}
+	return r.db
 }
 
 func processRow(r *sql.Row) (domain.User, error) {
