@@ -10,6 +10,27 @@ type Service struct {
 	repo domain.ArticleRepository
 }
 
-func (svc Service) GetAll() ([]domain.Article, error) {
-	return svc.repo.GetAll()
+func (svc Service) GetAll(onlyActive bool) ([]domain.Article, error) {
+	return svc.repo.GetAll(onlyActive)
+}
+
+type CreateArticleRequest interface {
+	Name() string
+	HasBarcode() bool
+	Barcode() string
+	IsActive() bool
+	Amount() int64
+}
+
+func (svc Service) CreateArticle(req CreateArticleRequest) (domain.Article, error) {
+	a := domain.Article{
+		Name:     req.Name(),
+		IsActive: req.IsActive(),
+		Amount:   req.Amount(),
+	}
+	if req.HasBarcode() {
+		a.Barcode = new(string)
+		*a.Barcode = req.Barcode()
+	}
+	return svc.repo.StoreArticle(a)
 }

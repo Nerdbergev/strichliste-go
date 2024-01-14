@@ -184,17 +184,12 @@ func ErrRender(err error) render.Renderer {
 type UserRequest struct {
 	NameParam  string  `json:"name"`
 	EmailParam *string `json:"email"`
-	hasMail    bool
 }
 
-func (u *UserRequest) Bind(r *http.Request) error {
+func (u UserRequest) Bind(r *http.Request) error {
 	if u.NameParam == "" {
 		return errors.New("missing required User fields.")
 	}
-	if u.EmailParam != nil {
-		u.hasMail = true
-	}
-
 	return nil
 }
 
@@ -203,12 +198,12 @@ func (u UserRequest) Name() string {
 }
 
 func (u UserRequest) Email() string {
-	if u.hasMail {
+	if u.HasEmail() {
 		return *u.EmailParam
 	}
 	return ""
 }
 
 func (u UserRequest) HasEmail() bool {
-	return u.hasMail
+	return u.EmailParam != nil
 }

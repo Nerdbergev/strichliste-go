@@ -28,8 +28,12 @@ type Repository struct {
 	db *sql.DB
 }
 
-func (r Repository) GetAll() ([]domain.Article, error) {
-	rows, err := r.db.Query("SELECT * FROM article")
+func (r Repository) GetAll(onlyActive bool) ([]domain.Article, error) {
+	query := "SELECT * FROM article"
+	if onlyActive {
+		query += " WHERE active = true"
+	}
+	rows, err := r.db.Query(query)
 	if err != nil {
 		return nil, err
 	}
@@ -48,8 +52,8 @@ func (r Repository) FindByBarcode(string) (domain.Article, error) {
 
 func (r Repository) StoreArticle(a domain.Article) (domain.Article, error) {
 	a.Created = time.Now()
-	res, err := r.db.Exec("INSERT INTO article (name, barcode, amount, active, created, usage_count) VALUES ($1, $2, $3, $4, $5, $6)",
-		a.Name, a.Barcode, a.Amount, a.IsActive, a.Created, a.UsageCount, nil)
+	res, err := r.db.Exec("INSERT INTO article (name, barcode, amount, active, created, usage_count) VALUES ($1, $2, $3, $4, $5, 0)",
+		a.Name, a.Barcode, a.Amount, a.IsActive, a.Created)
 	if err != nil {
 		return domain.Article{}, err
 	}

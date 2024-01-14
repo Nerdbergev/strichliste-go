@@ -3,7 +3,7 @@ parameters:
 
         article:
             enabled: true
-            autoOpen: false
+            autoOpen: true
 
         common:
             idleTimeout: 30000 # Time in ms

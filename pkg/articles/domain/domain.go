@@ -16,7 +16,7 @@ type Article struct {
 }
 
 type ArticleRepository interface {
-	GetAll() ([]Article, error)
+	GetAll(bool) ([]Article, error)
 	FindById(context.Context, int64) (Article, error)
 	FindByBarcode(string) (Article, error)
 	StoreArticle(Article) (Article, error)

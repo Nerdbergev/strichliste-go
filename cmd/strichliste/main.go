@@ -80,6 +80,7 @@ func main() {
 		r.Get("/settings", sh.GetSettings)
 		r.Route("/article", func(r chi.Router) {
 			r.Get("/", ah.GetAll)
+			r.Post("/", ah.CreateArticle)
 		})
 	})
 
