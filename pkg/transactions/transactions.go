@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 
+	adomain "github.com/nerdbergev/shoppinglist-go/pkg/articles/domain"
 	"github.com/nerdbergev/shoppinglist-go/pkg/transactions/domain"
 	udomain "github.com/nerdbergev/shoppinglist-go/pkg/users/domain"
 )
@@ -13,16 +14,18 @@ var (
 	ErrUserNotFound       = errors.New("User not found")
 )
 
-func NewService(repo domain.TransactionRepository, urepo udomain.UserRepository) Service {
+func NewService(repo domain.TransactionRepository, urepo udomain.UserRepository, arepo adomain.ArticleRepository) Service {
 	return Service{
 		repo:  repo,
 		urepo: urepo,
+		arepo: arepo,
 	}
 }
 
 type Service struct {
 	repo  domain.TransactionRepository
 	urepo udomain.UserRepository
+	arepo adomain.ArticleRepository
 }
 
 func (svc Service) GetFromUser(uid int64) ([]domain.Transaction, error) {
@@ -47,9 +50,14 @@ func (svc Service) ProcessTransaction(uid, amount int64, comment *string, quanti
 			Comment: comment,
 		}
 
-		// if articleID != nil {
+		if articleID != nil {
+			article, err := svc.arepo.FindById(ctx, *articleID)
+			if err != nil {
+				return err
+			}
+			t.Article = &article
 
-		// }
+		}
 
 		return nil
 	})

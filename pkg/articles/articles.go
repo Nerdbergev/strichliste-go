@@ -1,16 +1,15 @@
 package articles
 
-type Article struct {
-}
+import "github.com/nerdbergev/shoppinglist-go/pkg/articles/domain"
 
-type ArticleRepository interface {
-	FindById(int64) (Article, error)
-	FindByBarcode(string) (Article, error)
-	StoreArticle(Article) error
-	UpdateArticle(Article) error
-	DeleteById(int64) error
+func NewService(repo domain.ArticleRepository) Service {
+	return Service{repo: repo}
 }
 
 type Service struct {
-	articleRepo ArticleRepository
+	repo domain.ArticleRepository
+}
+
+func (svc Service) GetAll() ([]domain.Article, error) {
+	return svc.repo.GetAll()
 }

@@ -9,6 +9,9 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/go-chi/render"
+	"github.com/nerdbergev/shoppinglist-go/pkg/articles"
+	arepo "github.com/nerdbergev/shoppinglist-go/pkg/articles/repository"
+	arest "github.com/nerdbergev/shoppinglist-go/pkg/articles/rest"
 	"github.com/nerdbergev/shoppinglist-go/pkg/settings"
 	"github.com/nerdbergev/shoppinglist-go/pkg/transactions"
 	trepo "github.com/nerdbergev/shoppinglist-go/pkg/transactions/repository"
@@ -43,6 +46,10 @@ func main() {
 	sm := settings.NewService(yml)
 	sh := settings.NewHandler(sm)
 
+	ar := arepo.New(db)
+	asvc := articles.NewService(ar)
+	ah := arest.NewHandler(asvc)
+
 	ur := urepo.New(db)
 	usvc, err := users.NewService(sm, ur)
 	if err != nil {
@@ -51,7 +58,7 @@ func main() {
 	uh := urest.NewHandler(usvc)
 
 	tr := trepo.New(db)
-	tsvc := transactions.NewService(tr, ur)
+	tsvc := transactions.NewService(tr, ur, ar)
 	th := trest.NewHandler(tsvc)
 
 	r.Use(middleware.RequestID)
@@ -71,6 +78,9 @@ func main() {
 			r.Post("/", uh.CreateUser)
 		})
 		r.Get("/settings", sh.GetSettings)
+		r.Route("/article", func(r chi.Router) {
+			r.Get("/", ah.GetAll)
+		})
 	})
 
 	if err := http.ListenAndServe(":8081", r); err != nil {

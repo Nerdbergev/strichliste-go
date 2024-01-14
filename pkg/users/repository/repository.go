@@ -125,11 +125,7 @@ func (r Repository) DeleteById(int64) error {
 	return nil
 }
 
-type DB interface {
-	QueryRow(string, ...any) *sql.Row
-}
-
-func (r Repository) getDB(ctx context.Context) DB {
+func (r Repository) getDB(ctx context.Context) database.DB {
 	if db, ok := database.FromContext(ctx); ok {
 		return db
 	}

@@ -16,15 +16,15 @@ var (
 	ErrUserNotFound       = errors.New("User not found")
 )
 
-func New(db *sql.DB) TransactionRepository {
-	return TransactionRepository{db: db}
+func New(db *sql.DB) Repository {
+	return Repository{db: db}
 }
 
-type TransactionRepository struct {
+type Repository struct {
 	db *sql.DB
 }
 
-func (r TransactionRepository) FindByUserId(userID int64) ([]domain.Transaction, error) {
+func (r Repository) FindByUserId(userID int64) ([]domain.Transaction, error) {
 	query := `SELECT t.id, t.article_id, t.recipient_transaction_id, t.sender_transaction_id,
         t.quantity, t.comment, t.amount, t.deleted, t.created, u.id, u.name, u.email,
         u.balance, u.disabled, u.created, u.updated
@@ -54,7 +54,7 @@ func (r TransactionRepository) FindByUserId(userID int64) ([]domain.Transaction,
 	return transactions, nil
 }
 
-func (r TransactionRepository) Transaction(ctx context.Context, f func(ctx context.Context) error) error {
+func (r Repository) Transaction(ctx context.Context, f func(ctx context.Context) error) error {
 	tx, err := r.db.Begin()
 	if err != nil {
 		return err
@@ -69,7 +69,7 @@ func (r TransactionRepository) Transaction(ctx context.Context, f func(ctx conte
 	return tx.Commit()
 }
 
-func (r TransactionRepository) ProcessTransaction(userID, amount int64, comment string, quantity, articleID, recipientID *int64) (domain.Transaction, error) {
+func (r Repository) ProcessTransaction(userID, amount int64, comment string, quantity, articleID, recipientID *int64) (domain.Transaction, error) {
 	if (recipientID != nil || articleID != nil) && amount > 0 {
 		return domain.Transaction{}, ErrTransactionInvalid
 	}
@@ -124,7 +124,7 @@ type Article struct {
 	UsageCount  int64
 }
 
-func (r TransactionRepository) processPurchase(tx *sql.Tx, t Transaction, articleID, quantity *int64) error {
+func (r Repository) processPurchase(tx *sql.Tx, t Transaction, articleID, quantity *int64) error {
 	row := tx.QueryRow("SELECT * FROM article WHERE id = ?", articleID)
 	var a Article
 	err := row.Scan(a.ID, a.PrecursorID, a.Name, a.Barcode, a.Amount, a.IsActive, a.Created, a.UsageCount)
@@ -147,27 +147,27 @@ func (r TransactionRepository) processPurchase(tx *sql.Tx, t Transaction, articl
 	return nil
 }
 
-func (r TransactionRepository) StoreTransaction(t domain.Transaction) (domain.Transaction, error) {
+func (r Repository) StoreTransaction(t domain.Transaction) (domain.Transaction, error) {
 	return domain.Transaction{}, nil
 }
 
-func (r TransactionRepository) GetAll() ([]domain.Transaction, error) {
+func (r Repository) GetAll() ([]domain.Transaction, error) {
 	return nil, nil
 }
 
-func (r TransactionRepository) FindByUserIdAndTransactionId(uid, tid int64) (domain.Transaction, error) {
+func (r Repository) FindByUserIdAndTransactionId(uid, tid int64) (domain.Transaction, error) {
 	return domain.Transaction{}, nil
 }
-func (r TransactionRepository) DeleteByUserIdAndTransactionId(uid, tid int64) (domain.Transaction, error) {
+func (r Repository) DeleteByUserIdAndTransactionId(uid, tid int64) (domain.Transaction, error) {
 	return domain.Transaction{}, nil
 }
 
-func (r TransactionRepository) findUserById(tx *sql.Tx, userID int64) (User, error) {
+func (r Repository) findUserById(tx *sql.Tx, userID int64) (User, error) {
 	row := tx.QueryRow("SELECT * FROM user WHERE id = ?", userID)
 	return processUserRow(row)
 }
 
-func (r TransactionRepository) persistUserBalance(tx *sql.Tx, user User) error {
+func (r Repository) persistUserBalance(tx *sql.Tx, user User) error {
 	query := `UPDATE user SET balance = ? WHERE id = ?`
 	_, err := tx.Exec(query, user.Balance, user.ID)
 	return err
