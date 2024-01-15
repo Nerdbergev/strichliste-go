@@ -9,6 +9,7 @@ type ctxKey struct{}
 
 type DB interface {
 	QueryRow(string, ...any) *sql.Row
+	Exec(string, ...any) (sql.Result, error)
 }
 
 func AddToContext(ctx context.Context, db DB) context.Context {

@@ -147,8 +147,21 @@ func (r Repository) processPurchase(tx *sql.Tx, t Transaction, articleID, quanti
 	return nil
 }
 
-func (r Repository) StoreTransaction(t domain.Transaction) (domain.Transaction, error) {
-	return domain.Transaction{}, nil
+func (r Repository) StoreTransaction(ctx context.Context, t domain.Transaction) (domain.Transaction, error) {
+	query := `INSERT INTO transactions (amount, user_id, created, article_id, deleted) VALUES ($1, $2, $3, $4, false)`
+	var articleID *int64
+	if t.Article != nil {
+		articleID = &t.Article.ID
+	}
+	res, err := r.getDB(ctx).Exec(query, t.Amount, t.User.ID, t.Created, articleID)
+	if err != nil {
+		return domain.Transaction{}, err
+	}
+	t.ID, err = res.LastInsertId()
+	if err != nil {
+		return domain.Transaction{}, err
+	}
+	return t, nil
 }
 
 func (r Repository) GetAll() ([]domain.Transaction, error) {
@@ -241,4 +254,11 @@ func mapUserToDomain(u User) udomain.User {
 		*du.Updated = u.Updated.Time
 	}
 	return du
+}
+
+func (r Repository) getDB(ctx context.Context) database.DB {
+	if db, ok := database.FromContext(ctx); ok {
+		return db
+	}
+	return r.db
 }

@@ -54,7 +54,8 @@ type CreateUserRequest interface {
 
 func (svc Service) CreateUser(req CreateUserRequest) (domain.User, error) {
 	u := domain.User{
-		Name: req.Name(),
+		Name:    req.Name(),
+		Created: time.Now(),
 	}
 	if req.HasEmail() {
 		u.Email = new(string)

@@ -15,11 +15,15 @@ type Article struct {
 	UsageCount int64
 }
 
+func (a *Article) IncrementUsageCount() {
+	a.UsageCount += 1
+}
+
 type ArticleRepository interface {
 	GetAll(bool) ([]Article, error)
 	FindById(context.Context, int64) (Article, error)
 	FindByBarcode(string) (Article, error)
 	StoreArticle(Article) (Article, error)
-	UpdateArticle(Article) error
+	UpdateArticle(context.Context, Article) error
 	DeleteById(int64) error
 }

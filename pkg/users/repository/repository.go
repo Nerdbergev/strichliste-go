@@ -93,7 +93,6 @@ func (r Repository) AllInactive() ([]User, error) {
 }
 
 func (r Repository) StoreUser(u domain.User) (domain.User, error) {
-	u.Created = time.Now()
 	res, err := r.db.Exec("INSERT INTO user (name, email, created, balance, disabled, updated) VALUES ($1, $2, $3, 0, false, $4)", u.Name,
 		u.Email, u.Created, nil)
 	if err != nil {
@@ -117,7 +116,12 @@ func (r Repository) FindById(ctx context.Context, id int64) (domain.User, error)
 	return processRow(row)
 }
 
-func (r Repository) UpdateUser(domain.User) error {
+func (r Repository) UpdateUser(ctx context.Context, u domain.User) error {
+	_, err := r.getDB(ctx).Exec("UPDATE user SET name=$1, email=$2, balance=$3, disabled=$4, updated=$5 WHERE ID = $6",
+		u.Name, u.Email, u.Balance, u.IsDisabled, u.Updated, u.ID)
+	if err != nil {
+		return err
+	}
 	return nil
 }
 

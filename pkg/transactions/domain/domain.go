@@ -24,7 +24,7 @@ type Transaction struct {
 type TransactionRepository interface {
 	Transaction(context.Context, func(context.Context) error) error
 	GetAll() ([]Transaction, error)
-	StoreTransaction(Transaction) (Transaction, error)
+	StoreTransaction(context.Context, Transaction) (Transaction, error)
 	FindByUserId(int64) ([]Transaction, error)
 	FindByUserIdAndTransactionId(uid, tid int64) (Transaction, error)
 	DeleteByUserIdAndTransactionId(uid, tid int64) (Transaction, error)

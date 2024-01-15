@@ -65,7 +65,7 @@ func (r Repository) StoreArticle(a domain.Article) (domain.Article, error) {
 	return a, nil
 }
 
-func (r Repository) UpdateArticle(a domain.Article) error {
+func (r Repository) UpdateArticle(ctx context.Context, a domain.Article) error {
 	return nil
 }
 
