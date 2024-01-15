@@ -3,6 +3,7 @@ package users
 import (
 	"context"
 	"errors"
+	"fmt"
 	"time"
 
 	"github.com/nerdbergev/shoppinglist-go/pkg/settings"
@@ -32,7 +33,18 @@ type Service struct {
 }
 
 func (svc Service) GetAll() ([]domain.User, error) {
-	return svc.repo.GetAll()
+	staleDateTime := svc.GetStaleDateTime()
+	users, err := svc.repo.GetAll()
+	if err != nil {
+		return nil, err
+	}
+	for i := range users {
+		if users[i].Updated != nil && users[i].Updated.After(staleDateTime) {
+			users[i].IsActive = true
+		}
+	}
+	fmt.Println(users)
+	return users, nil
 }
 
 type FindByStateRequest interface {
@@ -41,6 +53,7 @@ type FindByStateRequest interface {
 
 func (svc Service) FindByState(req FindByStateRequest) ([]domain.User, error) {
 	if req.Active() {
+		fmt.Println(svc.GetStaleDateTime())
 		return svc.repo.FindActive(svc.GetStaleDateTime())
 	}
 	return svc.repo.FindInactive(svc.GetStaleDateTime())

@@ -127,6 +127,7 @@ func MapUser(u domain.User) User {
 		ID:         u.ID,
 		Name:       u.Name,
 		Balance:    u.Balance,
+		IsActive:   u.IsActive,
 		IsDisabled: u.IsDisabled,
 		Created:    u.Created,
 		Updated:    u.Updated,
