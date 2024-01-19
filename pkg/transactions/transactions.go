@@ -60,6 +60,9 @@ func (svc Service) ProcessTransaction(uid, amount int64, comment *string, quanti
 			if err != nil {
 				return err
 			}
+			if !article.IsActive {
+				return errors.New("article inactive")
+			}
 			t.Article = &article
 			if quantity == nil {
 				quantity = new(int64)

@@ -6,6 +6,7 @@ import (
 	"errors"
 	"time"
 
+	adomain "github.com/nerdbergev/shoppinglist-go/pkg/articles/domain"
 	"github.com/nerdbergev/shoppinglist-go/pkg/database"
 	"github.com/nerdbergev/shoppinglist-go/pkg/transactions/domain"
 	udomain "github.com/nerdbergev/shoppinglist-go/pkg/users/domain"
@@ -25,11 +26,13 @@ type Repository struct {
 }
 
 func (r Repository) FindByUserId(userID int64) ([]domain.Transaction, error) {
-	query := `SELECT t.id, t.article_id, t.recipient_transaction_id, t.sender_transaction_id,
+	query := `SELECT t.id, t.recipient_transaction_id, t.sender_transaction_id,
         t.quantity, t.comment, t.amount, t.deleted, t.created, u.id, u.name, u.email,
-        u.balance, u.disabled, u.created, u.updated
+        u.balance, u.disabled, u.created, u.updated, a.id, a.name, a.barcode, a.amount,
+        a.active, a.created, a.usage_count
     FROM transactions AS t
     JOIN user AS u ON t.user_id = u.id
+    JOIN article as a ON t.article_id = a.id
     WHERE t.user_id = ?`
 	rows, err := r.db.Query(query, userID)
 	if err != nil {
@@ -41,13 +44,16 @@ func (r Repository) FindByUserId(userID int64) ([]domain.Transaction, error) {
 	for rows.Next() {
 		var t Transaction
 		var u User
-		err := rows.Scan(&t.ID, &t.ArticleID, &t.RecipientID, &t.SenderID, &t.Quantity, &t.Comment,
+		var a Article
+		err := rows.Scan(&t.ID, &t.RecipientID, &t.SenderID, &t.Quantity, &t.Comment,
 			&t.Amount, &t.IsDeleted, &t.Created, &u.ID, &u.Name, &u.Email, &u.Balance, &u.IsDisabled,
-			&u.Created, &u.Updated)
+			&u.Created, &u.Updated, &a.ID, &a.Name, &a.Barcode, &a.Amount, &a.IsActive, &a.Created,
+			&a.UsageCount)
 		if err != nil {
 			return nil, err
 		}
 		t.User = u
+		t.Article = a
 		transactions = append(transactions, mapTransactionToDomain(t))
 	}
 
@@ -69,50 +75,6 @@ func (r Repository) Transaction(ctx context.Context, f func(ctx context.Context)
 	return tx.Commit()
 }
 
-func (r Repository) ProcessTransaction(userID, amount int64, comment string, quantity, articleID, recipientID *int64) (domain.Transaction, error) {
-	if (recipientID != nil || articleID != nil) && amount > 0 {
-		return domain.Transaction{}, ErrTransactionInvalid
-	}
-
-	tx, err := r.db.Begin()
-	if err != nil {
-		return domain.Transaction{}, err
-	}
-	defer tx.Rollback()
-
-	user, err := r.findUserById(tx, userID)
-	if err != nil {
-		return domain.Transaction{}, err
-	}
-
-	user.Balance += amount
-	_ = r.persistUserBalance(tx, user)
-	t := Transaction{
-		Created: time.Now(),
-		User:    user,
-	}
-
-	switch {
-	case articleID != nil:
-		r.processPurchase(tx, t, articleID, quantity)
-	case recipientID != nil:
-		// r.processTransfer(tx)
-	}
-
-	query := `INSERT INTO transactions (amount, user_id, created, deleted) VALUES ($1, $2, $3, false)`
-	res, err := tx.Exec(query, amount, userID, t.Created)
-	if err != nil {
-		return domain.Transaction{}, err
-	}
-	t.ID, err = res.LastInsertId()
-	if err != nil {
-		return domain.Transaction{}, err
-	}
-	t.Amount = amount
-	_ = tx.Commit()
-	return mapTransactionToDomain(t), nil
-}
-
 type Article struct {
 	ID          int64
 	PrecursorID sql.NullInt64
@@ -122,29 +84,6 @@ type Article struct {
 	IsActive    bool
 	Created     time.Time
 	UsageCount  int64
-}
-
-func (r Repository) processPurchase(tx *sql.Tx, t Transaction, articleID, quantity *int64) error {
-	row := tx.QueryRow("SELECT * FROM article WHERE id = ?", articleID)
-	var a Article
-	err := row.Scan(a.ID, a.PrecursorID, a.Name, a.Barcode, a.Amount, a.IsActive, a.Created, a.UsageCount)
-	if err != nil {
-		return err
-	}
-
-	if !a.IsActive {
-		return errors.New("Article Inactive")
-	}
-
-	if quantity == nil {
-		quantity = new(int64)
-		*quantity = 1
-	}
-	t.Quantity.Int64 = *quantity
-	t.Amount = a.Amount * *quantity * -1
-	t.ArticleID.Int64 = a.ID
-
-	return nil
 }
 
 func (r Repository) StoreTransaction(ctx context.Context, t domain.Transaction) (domain.Transaction, error) {
@@ -196,7 +135,7 @@ func processUserRow(r *sql.Row) (User, error) {
 type Transaction struct {
 	ID          int64
 	User        User
-	ArticleID   sql.NullInt64
+	Article     Article
 	RecipientID sql.NullInt64
 	SenderID    sql.NullInt64
 	Quantity    sql.NullInt64
@@ -220,6 +159,7 @@ func mapTransactionToDomain(t Transaction) domain.Transaction {
 	dt := domain.Transaction{
 		ID:        t.ID,
 		User:      mapUserToDomain(t.User),
+		Article:   mapArticleToDomain(t.Article),
 		Amount:    t.Amount,
 		IsDeleted: t.IsDeleted,
 		Created:   t.Created,
@@ -254,6 +194,24 @@ func mapUserToDomain(u User) udomain.User {
 		*du.Updated = u.Updated.Time
 	}
 	return du
+}
+
+func mapArticleToDomain(a Article) *adomain.Article {
+	da := &adomain.Article{
+		ID:         a.ID,
+		Name:       a.Name,
+		Amount:     a.Amount,
+		IsActive:   a.IsActive,
+		Created:    a.Created,
+		UsageCount: a.UsageCount,
+	}
+
+	if a.Barcode.Valid {
+		da.Barcode = new(string)
+		*da.Barcode = a.Barcode.String
+	}
+
+	return da
 }
 
 func (r Repository) getDB(ctx context.Context) database.DB {

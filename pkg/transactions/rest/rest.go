@@ -8,6 +8,7 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/render"
+	adomain "github.com/nerdbergev/shoppinglist-go/pkg/articles/domain"
 	"github.com/nerdbergev/shoppinglist-go/pkg/transactions"
 	"github.com/nerdbergev/shoppinglist-go/pkg/transactions/domain"
 	udomain "github.com/nerdbergev/shoppinglist-go/pkg/users/domain"
@@ -58,7 +59,7 @@ func (h Handler) CreateTransaction(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	tr, err := h.svc.ProcessTransaction(uid, data.Amount, nil, nil, nil, nil)
+	tr, err := h.svc.ProcessTransaction(uid, data.Amount, nil, nil, data.ArticleID, nil)
 	if err != nil {
 		_ = render.Render(w, r, ErrRender(err))
 		return
@@ -110,7 +111,8 @@ func MapTransaction(t domain.Transaction) Transaction {
 	}
 
 	if t.Article != nil {
-		resp.ArticleID = &t.Article.ID
+		resp.Article = new(Article)
+		*resp.Article = mapArticle(*t.Article)
 	}
 	if t.Recipient != nil {
 		resp.RecipientID = &t.Recipient.ID
@@ -141,17 +143,17 @@ func MapUser(u udomain.User) User {
 }
 
 type Transaction struct {
-	ID           int64  `json:"id"`
-	User         User   `json:"user"`
-	ArticleID    *int64 `json:"article_id"`
-	RecipientID  *int64 `json:"recipient"`
-	SenderID     *int64 `json:"sender"`
-	Quantity     *int64 `json:"quantity"`
-	Comment      string `json:"comment"`
-	Amount       int64  `json:"amount"`
-	IsDeleted    bool   `json:"isDeleted"`
-	IsDeleteable bool   `json:"isDeletable"`
-	Created      string `json:"created"`
+	ID           int64    `json:"id"`
+	User         User     `json:"user"`
+	Article      *Article `json:"article"`
+	RecipientID  *int64   `json:"recipient"`
+	SenderID     *int64   `json:"sender"`
+	Quantity     *int64   `json:"quantity"`
+	Comment      string   `json:"comment"`
+	Amount       int64    `json:"amount"`
+	IsDeleted    bool     `json:"isDeleted"`
+	IsDeleteable bool     `json:"isDeletable"`
+	Created      string   `json:"created"`
 }
 
 type User struct {
@@ -163,6 +165,34 @@ type User struct {
 	IsDisabled bool       `json:"isDisabled"`
 	Created    time.Time  `json:"created"`
 	Updated    *time.Time `json:"updated"`
+}
+
+type Article struct {
+	ID         int64     `json:"id"`
+	Name       string    `json:"name"`
+	Barcode    *string   `json:"barcode"`
+	Amount     int64     `json:"amount"`
+	IsActive   bool      `json:"isActive"`
+	UsageCount int64     `json:"usageCount"`
+	Precursor  *Article  `json:"precursor"`
+	Created    time.Time `json:"created"`
+}
+
+func mapArticle(a adomain.Article) Article {
+	resp := Article{
+		ID:         a.ID,
+		Name:       a.Name,
+		Amount:     a.Amount,
+		IsActive:   a.IsActive,
+		UsageCount: a.UsageCount,
+		Created:    a.Created,
+	}
+
+	if a.Barcode != nil {
+		resp.Barcode = new(string)
+		*resp.Barcode = *a.Barcode
+	}
+	return resp
 }
 
 type ErrResponse struct {

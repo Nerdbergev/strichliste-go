@@ -66,7 +66,9 @@ func (r Repository) StoreArticle(a domain.Article) (domain.Article, error) {
 }
 
 func (r Repository) UpdateArticle(ctx context.Context, a domain.Article) error {
-	return nil
+	_, err := r.getDB(ctx).Exec("UPDATE article SET name=$1, barcode=$2, amount=$3, active=$4, usage_count=$5 WHERE ID = $6",
+		a.Name, a.Barcode, a.Amount, a.IsActive, a.UsageCount, a.ID)
+	return err
 }
 
 func (r Repository) DeleteById(int64) error {
