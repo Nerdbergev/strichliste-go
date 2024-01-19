@@ -43,22 +43,22 @@ func main() {
 		log.Fatal(err)
 	}
 
-	sm := settings.NewService(yml)
-	sh := settings.NewHandler(sm)
+	ss := settings.NewService(yml)
+	sh := settings.NewHandler(ss)
 
 	ar := arepo.New(db)
 	asvc := articles.NewService(ar)
 	ah := arest.NewHandler(asvc)
 
 	ur := urepo.New(db)
-	usvc, err := users.NewService(sm, ur)
+	usvc, err := users.NewService(ss, ur)
 	if err != nil {
 		log.Fatal(err)
 	}
 	uh := urest.NewHandler(usvc)
 
 	tr := trepo.New(db)
-	tsvc := transactions.NewService(tr, ur, ar)
+	tsvc := transactions.NewService(tr, ur, ar, ss)
 	th := trest.NewHandler(tsvc)
 
 	r.Use(middleware.RequestID)

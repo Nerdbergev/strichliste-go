@@ -18,15 +18,29 @@ type Service struct {
 	m map[string]any
 }
 
-func (sm Service) Get(k string) any {
+func (svc Service) Get(k string) any {
 	parts := strings.Split(k, ".")
 
-	var m map[string]any = sm.m["settings"].(map[string]any)
+	var m map[string]any = svc.m["settings"].(map[string]any)
 	for _, p := range parts[:len(parts)-1] {
-		m = m[p].(map[string]any)
+		v := m[p]
+		if v == nil {
+			return nil
+		}
+		m = v.(map[string]any)
 	}
 
 	return m[parts[len(parts)-1]]
+}
+
+func (svc Service) GetInt(k string) (int, bool) {
+	val := svc.Get(k)
+	if val == nil {
+		return 0, false
+	}
+
+	v, ok := val.(int)
+	return v, ok
 }
 
 type Handler struct {

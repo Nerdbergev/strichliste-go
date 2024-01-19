@@ -3,7 +3,6 @@ package users
 import (
 	"context"
 	"errors"
-	"fmt"
 	"time"
 
 	"github.com/nerdbergev/shoppinglist-go/pkg/settings"
@@ -43,7 +42,6 @@ func (svc Service) GetAll() ([]domain.User, error) {
 			users[i].IsActive = true
 		}
 	}
-	fmt.Println(users)
 	return users, nil
 }
 
@@ -53,7 +51,6 @@ type FindByStateRequest interface {
 
 func (svc Service) FindByState(req FindByStateRequest) ([]domain.User, error) {
 	if req.Active() {
-		fmt.Println(svc.GetStaleDateTime())
 		return svc.repo.FindActive(svc.GetStaleDateTime())
 	}
 	return svc.repo.FindInactive(svc.GetStaleDateTime())
