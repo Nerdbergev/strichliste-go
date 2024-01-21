@@ -7,6 +7,7 @@ import (
 
 	"github.com/nerdbergev/shoppinglist-go/pkg/database"
 	"github.com/nerdbergev/shoppinglist-go/pkg/users/domain"
+	"github.com/pkg/errors"
 )
 
 type User struct {
@@ -113,7 +114,14 @@ func (r Repository) FindByName(name string) (domain.User, error) {
 
 func (r Repository) FindById(ctx context.Context, id int64) (domain.User, error) {
 	row := r.getDB(ctx).QueryRow("SELECT * FROM user WHERE id = ?", id)
-	return processRow(row)
+	u, err := processRow(row)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return domain.User{}, errors.Wrap(domain.UserNotFoundError{UID: id}, err.Error())
+		}
+		return domain.User{}, errors.Wrap(domain.ErrPersistanceError, err.Error())
+	}
+	return u, nil
 }
 
 func (r Repository) UpdateUser(ctx context.Context, u domain.User) error {

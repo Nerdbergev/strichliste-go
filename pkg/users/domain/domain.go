@@ -2,8 +2,23 @@ package domain
 
 import (
 	"context"
+	"errors"
+	"fmt"
 	"time"
 )
+
+var (
+	ErrPersistanceError = errors.New("persistance error")
+)
+
+type UserNotFoundError struct {
+	UID   int64
+	Cause error
+}
+
+func (e UserNotFoundError) Error() string {
+	return fmt.Sprintf("User '%d' not found", e.UID)
+}
 
 type User struct {
 	ID         int64

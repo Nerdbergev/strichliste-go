@@ -27,18 +27,14 @@ func (h Handler) FindById(w http.ResponseWriter, r *http.Request) {
 	idParam := chi.URLParam(r, "id")
 	id, err := strconv.ParseInt(idParam, 10, 64)
 	if err != nil {
-		_ = render.Render(w, r, ErrServerError(err))
+		_ = render.Render(w, r, ErrRender(err))
 		return
 	}
 
 	user, err := h.svc.FindById(id)
 	if err != nil {
-		var derr domain.UserNotFoundError
-		if errors.As(err, &derr) {
-			_ = render.Render(w, r, ErrUserNotFound(derr))
-			return
-		}
-		_ = render.Render(w, r, ErrServerError(err))
+        if errors.Is(err, domain.UserNotFoundError)
+		_ = render.Render(w, r, ErrRender(err))
 		return
 	}
 	_ = render.Render(w, r, NewUserResponse(user))
@@ -61,19 +57,19 @@ func (h Handler) GetAll(w http.ResponseWriter, r *http.Request) {
 	if activeParam == "" {
 		users, err = h.svc.GetAll()
 		if err != nil {
-			_ = render.Render(w, r, ErrServerError(err))
+			_ = render.Render(w, r, ErrRender(err))
 			return
 		}
 	} else {
 		isActive, perr := strconv.ParseBool(activeParam)
 		if perr != nil {
-			_ = render.Render(w, r, ErrServerError(perr))
+			_ = render.Render(w, r, ErrRender(perr))
 			return
 		}
 		users, err = h.svc.FindByState(getAllRequest{active: isActive})
 	}
 	if err != nil {
-		_ = render.Render(w, r, ErrServerError(err))
+		_ = render.Render(w, r, ErrRender(err))
 		return
 	}
 
@@ -82,7 +78,7 @@ func (h Handler) GetAll(w http.ResponseWriter, r *http.Request) {
 	})
 
 	if err := render.Render(w, r, NewUserListResponse(users)); err != nil {
-		_ = render.Render(w, r, ErrServerError(err))
+		_ = render.Render(w, r, ErrRender(err))
 	}
 }
 
@@ -95,7 +91,7 @@ func (h Handler) CreateUser(w http.ResponseWriter, r *http.Request) {
 
 	created, err := h.svc.CreateUser(uReq)
 	if err != nil {
-		_ = render.Render(w, r, ErrServerError(err))
+		_ = render.Render(w, r, ErrRender(err))
 	}
 	render.JSON(w, r, NewUserResponse(created))
 }
@@ -155,46 +151,35 @@ func (ur UserResponse) Render(w http.ResponseWriter, r *http.Request) error {
 	return nil
 }
 
-type Error struct {
-	Class   string `json:"class"`
-	Code    int    `json:"code"`
-	Message string `json:"message"`
-}
-
 type ErrResponse struct {
-	Error Error `json:"error"`
+	Err            error `json:"-"` // low-level runtime error
+	HTTPStatusCode int   `json:"-"` // http response status code
+
+	StatusText string `json:"status"`          // user-level status message
+	AppCode    int64  `json:"code,omitempty"`  // application-specific error code
+	ErrorText  string `json:"error,omitempty"` // application-level error message, for debugging
 }
 
 func (e *ErrResponse) Render(w http.ResponseWriter, r *http.Request) error {
-	render.Status(r, e.Error.Code)
+	render.Status(r, e.HTTPStatusCode)
 	return nil
 }
 
 func ErrInvalidRequest(err error) render.Renderer {
 	return &ErrResponse{
-		Error: Error{
-			Code:    http.StatusBadRequest,
-			Message: err.Error(),
-		},
+		Err:            err,
+		HTTPStatusCode: 400,
+		StatusText:     "Invalid request.",
+		ErrorText:      err.Error(),
 	}
 }
 
-func ErrUserNotFound(err domain.UserNotFoundError) render.Renderer {
+func ErrRender(err error) render.Renderer {
 	return &ErrResponse{
-		Error: Error{
-			Class:   "App\\Exception\\UserNotFoundException",
-			Code:    http.StatusNotFound,
-			Message: err.Error(),
-		},
-	}
-}
-
-func ErrServerError(err error) render.Renderer {
-	return &ErrResponse{
-		Error: Error{
-			Message: "Internal Server Error",
-			Code:    http.StatusInternalServerError,
-		},
+		Err:            err,
+		HTTPStatusCode: 422,
+		StatusText:     "Error rendering response.",
+		ErrorText:      err.Error(),
 	}
 }
 
