@@ -26,14 +26,14 @@ type Repository struct {
 }
 
 func (r Repository) FindByUserId(userID int64) ([]domain.Transaction, error) {
-	query := `SELECT t.id, t.recipient_transaction_id, t.sender_transaction_id,
-        t.quantity, t.comment, t.amount, t.deleted, t.created, u.id, u.name, u.email,
-        u.balance, u.disabled, u.created, u.updated, a.id, a.name, a.barcode, a.amount,
-        a.active, a.created, a.usage_count
-    FROM transactions AS t
-    JOIN user AS u ON t.user_id = u.id
-    JOIN article as a ON t.article_id = a.id
-    WHERE t.user_id = ?`
+	query := `
+        SELECT t.id, t.article_id, t.recipient_transaction_id, t.sender_transaction_id, t.quantity, t.comment,
+        t.amount, t.deleted, t.created, u.id, u.name, u.email, u.balance, u.disabled, u.created,
+        u.updated
+        FROM transactions AS t
+	    JOIN user AS u ON t.user_id = u.id
+	    WHERE t.user_id = ?`
+
 	rows, err := r.db.Query(query, userID)
 	if err != nil {
 		return nil, err
@@ -42,18 +42,46 @@ func (r Repository) FindByUserId(userID int64) ([]domain.Transaction, error) {
 
 	var transactions []domain.Transaction
 	for rows.Next() {
-		var t Transaction
-		var u User
-		var a Article
-		err := rows.Scan(&t.ID, &t.RecipientID, &t.SenderID, &t.Quantity, &t.Comment,
+		var (
+			t           Transaction
+			u           User
+			articleID   sql.NullInt64
+			recipientID sql.NullInt64
+			senderID    sql.NullInt64
+		)
+		err := rows.Scan(&t.ID, &articleID, &recipientID, &senderID, &t.Quantity, &t.Comment,
 			&t.Amount, &t.IsDeleted, &t.Created, &u.ID, &u.Name, &u.Email, &u.Balance, &u.IsDisabled,
-			&u.Created, &u.Updated, &a.ID, &a.Name, &a.Barcode, &a.Amount, &a.IsActive, &a.Created,
-			&a.UsageCount)
+			&u.Created, &u.Updated)
 		if err != nil {
 			return nil, err
 		}
+		if articleID.Valid {
+			article, err := r.findArticleById(articleID.Int64)
+			if err != nil {
+				return nil, err
+			}
+			t.Article = new(Article)
+			*t.Article = article
+		}
+		if recipientID.Valid {
+			recipientTransaction, err := r.findById(recipientID.Int64)
+			if err != nil {
+				return nil, err
+			}
+			t.RecipientTransaction = new(Transaction)
+			*t.RecipientTransaction = recipientTransaction
+		}
+
+		if senderID.Valid {
+			senderTransaction, err := r.findById(senderID.Int64)
+			if err != nil {
+				return nil, err
+			}
+			t.SenderTransaction = new(Transaction)
+			*t.SenderTransaction = senderTransaction
+		}
+
 		t.User = u
-		t.Article = a
 		transactions = append(transactions, mapTransactionToDomain(t))
 	}
 
@@ -87,12 +115,20 @@ type Article struct {
 }
 
 func (r Repository) StoreTransaction(ctx context.Context, t domain.Transaction) (domain.Transaction, error) {
-	query := `INSERT INTO transactions (amount, user_id, created, article_id, deleted) VALUES ($1, $2, $3, $4, false)`
-	var articleID *int64
+	query := `INSERT INTO transactions
+                (amount, user_id, created, article_id, deleted, recipient_transaction_id)
+                VALUES ($1, $2, $3, $4, false, $5)`
+	var (
+		articleID              *int64
+		recipientTransactionID *int64
+	)
 	if t.Article != nil {
 		articleID = &t.Article.ID
 	}
-	res, err := r.getDB(ctx).Exec(query, t.Amount, t.User.ID, t.Created, articleID)
+	if t.RecipientTransaction != nil {
+		recipientTransactionID = &t.RecipientTransaction.ID
+	}
+	res, err := r.getDB(ctx).Exec(query, t.Amount, t.User.ID, t.Created, articleID, recipientTransactionID)
 	if err != nil {
 		return domain.Transaction{}, err
 	}
@@ -114,35 +150,66 @@ func (r Repository) DeleteByUserIdAndTransactionId(uid, tid int64) (domain.Trans
 	return domain.Transaction{}, nil
 }
 
-func (r Repository) findUserById(tx *sql.Tx, userID int64) (User, error) {
-	row := tx.QueryRow("SELECT * FROM user WHERE id = ?", userID)
-	return processUserRow(row)
-}
-
-func (r Repository) persistUserBalance(tx *sql.Tx, user User) error {
-	query := `UPDATE user SET balance = ? WHERE id = ?`
-	_, err := tx.Exec(query, user.Balance, user.ID)
+func (r Repository) UpdateSenderTransaction(ctx context.Context, t domain.Transaction) error {
+	query := `UPDATE transactions SET sender_transaction_id = $1 WHERE id = $2`
+	_, err := r.getDB(ctx).Exec(query, t.SenderTransaction.ID, t.ID)
 	return err
 }
 
-func processUserRow(r *sql.Row) (User, error) {
-	var user User
-	err := r.Scan(&user.ID, &user.Name, &user.Email, &user.Balance, &user.IsDisabled, &user.Created,
-		&user.Updated)
-	return user, err
+func (r Repository) findArticleById(aid int64) (Article, error) {
+	row := r.db.QueryRow("SELECT * FROM article WHERE id = ?", aid)
+	var a Article
+	err := row.Scan(&a.ID, &a.PrecursorID, &a.Name, &a.Barcode, &a.Amount, &a.IsActive, &a.Created, &a.UsageCount)
+	return a, err
+}
+
+func (r Repository) findById(id int64) (Transaction, error) {
+	query := `
+        SELECT t.id, t.article_id, t.quantity, t.comment, t.amount, t.deleted, t.created,
+               u.id, u.name, u.email, u.balance, u.disabled, u.created, u.updated
+        FROM transactions AS t
+	    JOIN user AS u ON t.user_id = u.id
+	    WHERE t.id = ?`
+	row := r.db.QueryRow(query, id)
+
+	var (
+		t         Transaction
+		u         User
+		articleID sql.NullInt64
+	)
+	err := row.Scan(&t.ID, &articleID, &t.Quantity, &t.Comment,
+		&t.Amount, &t.IsDeleted, &t.Created, &u.ID, &u.Name, &u.Email, &u.Balance, &u.IsDisabled,
+		&u.Created, &u.Updated)
+
+	if err != nil {
+		return Transaction{}, err
+	}
+
+	t.User = u
+
+	if articleID.Valid {
+		article, err := r.findArticleById(articleID.Int64)
+		if err != nil {
+			return Transaction{}, err
+		}
+		t.Article = new(Article)
+		*t.Article = article
+	}
+
+	return t, nil
 }
 
 type Transaction struct {
-	ID          int64
-	User        User
-	Article     Article
-	RecipientID sql.NullInt64
-	SenderID    sql.NullInt64
-	Quantity    sql.NullInt64
-	Comment     sql.NullString
-	Amount      int64
-	IsDeleted   bool
-	Created     time.Time
+	ID                   int64
+	User                 User
+	Article              *Article
+	RecipientTransaction *Transaction
+	SenderTransaction    *Transaction
+	Quantity             sql.NullInt64
+	Comment              sql.NullString
+	Amount               int64
+	IsDeleted            bool
+	Created              time.Time
 }
 
 type User struct {
@@ -159,7 +226,6 @@ func mapTransactionToDomain(t Transaction) domain.Transaction {
 	dt := domain.Transaction{
 		ID:        t.ID,
 		User:      mapUserToDomain(t.User),
-		Article:   mapArticleToDomain(t.Article),
 		Amount:    t.Amount,
 		IsDeleted: t.IsDeleted,
 		Created:   t.Created,
@@ -173,6 +239,20 @@ func mapTransactionToDomain(t Transaction) domain.Transaction {
 	if t.Comment.Valid {
 		dt.Comment = new(string)
 		dt.Comment = &t.Comment.String
+	}
+
+	if t.Article != nil {
+		dt.Article = mapArticleToDomain(*t.Article)
+	}
+
+	if t.SenderTransaction != nil {
+		dt.SenderTransaction = new(domain.Transaction)
+		*dt.SenderTransaction = mapTransactionToDomain(*t.SenderTransaction)
+	}
+
+	if t.RecipientTransaction != nil {
+		dt.RecipientTransaction = new(domain.Transaction)
+		*dt.RecipientTransaction = mapTransactionToDomain(*t.RecipientTransaction)
 	}
 	return dt
 }

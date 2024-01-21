@@ -55,8 +55,9 @@ func (svc Service) ProcessTransaction(uid, amount int64, comment *string, quanti
 			Created: time.Now(),
 		}
 
+		var article adomain.Article
 		if articleID != nil {
-			article, err := svc.arepo.FindById(ctx, *articleID)
+			article, err = svc.arepo.FindById(ctx, *articleID)
 			if err != nil {
 				return err
 			}
@@ -76,6 +77,40 @@ func (svc Service) ProcessTransaction(uid, amount int64, comment *string, quanti
 			}
 		}
 
+		var recipientTransaction domain.Transaction
+		if recipientID != nil {
+			recipient, err := svc.urepo.FindById(ctx, *recipientID)
+			if err != nil {
+				return err
+			}
+
+			recipientTransaction = domain.Transaction{
+				Amount:  amount * -1,
+				Comment: comment,
+				User:    recipient,
+				Created: time.Now(),
+			}
+
+			if articleID != nil {
+				recipientTransaction.Article = &article
+			}
+
+			recipient.AddBalance(amount * -1)
+			if err := svc.checkAccountBalanceBoundary(recipient); err != nil {
+				return err
+			}
+
+			recipientTransaction, err = svc.repo.StoreTransaction(ctx, recipientTransaction)
+			if err != nil {
+				return err
+			}
+			t.RecipientTransaction = &recipientTransaction
+
+			if err := svc.urepo.UpdateUser(ctx, recipient); err != nil {
+				return err
+			}
+		}
+
 		t.Amount = amount
 		if err := svc.checkTransactionBoundary(amount); err != nil {
 			return err
@@ -89,6 +124,12 @@ func (svc Service) ProcessTransaction(uid, amount int64, comment *string, quanti
 		processed, err = svc.repo.StoreTransaction(ctx, t)
 		if err != nil {
 			return err
+		}
+		if recipientID != nil {
+			recipientTransaction.SenderTransaction = &processed
+			if err := svc.repo.UpdateSenderTransaction(ctx, recipientTransaction); err != nil {
+				return err
+			}
 		}
 
 		err = svc.urepo.UpdateUser(ctx, user)

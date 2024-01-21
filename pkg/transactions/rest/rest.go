@@ -59,7 +59,7 @@ func (h Handler) CreateTransaction(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	tr, err := h.svc.ProcessTransaction(uid, data.Amount, nil, nil, data.ArticleID, nil)
+	tr, err := h.svc.ProcessTransaction(uid, data.Amount, nil, nil, data.ArticleID, data.RecipientID)
 	if err != nil {
 		_ = render.Render(w, r, ErrRender(err))
 		return
@@ -114,11 +114,13 @@ func MapTransaction(t domain.Transaction) Transaction {
 		resp.Article = new(Article)
 		*resp.Article = mapArticle(*t.Article)
 	}
-	if t.Recipient != nil {
-		resp.RecipientID = &t.Recipient.ID
+	if t.RecipientTransaction != nil {
+		resp.Recipient = new(User)
+		*resp.Recipient = MapUser(t.RecipientTransaction.User)
 	}
-	if t.Sender != nil {
-		resp.SenderID = &t.Sender.ID
+	if t.SenderTransaction != nil {
+		resp.Sender = new(User)
+		*resp.Sender = MapUser(t.SenderTransaction.User)
 	}
 	if t.Quantity != nil {
 		resp.Quantity = t.Quantity
@@ -128,12 +130,12 @@ func MapTransaction(t domain.Transaction) Transaction {
 
 func MapUser(u udomain.User) User {
 	resp := User{
-		ID:      u.ID,
-		Name:    u.Name,
-		Balance: u.Balance,
-		// IsDisabled: u.Disabled,
-		Created: u.Created,
-		Updated: u.Updated,
+		ID:         u.ID,
+		Name:       u.Name,
+		Balance:    u.Balance,
+		IsDisabled: u.IsDisabled,
+		Created:    u.Created,
+		Updated:    u.Updated,
 	}
 
 	if u.Email != nil {
@@ -146,8 +148,8 @@ type Transaction struct {
 	ID           int64    `json:"id"`
 	User         User     `json:"user"`
 	Article      *Article `json:"article"`
-	RecipientID  *int64   `json:"recipient"`
-	SenderID     *int64   `json:"sender"`
+	Recipient    *User    `json:"recipient"`
+	Sender       *User    `json:"sender"`
 	Quantity     *int64   `json:"quantity"`
 	Comment      string   `json:"comment"`
 	Amount       int64    `json:"amount"`
