@@ -12,12 +12,21 @@ var (
 )
 
 type UserNotFoundError struct {
-	UID   int64
-	Cause error
+	Identifier string
+	Cause      error
 }
 
 func (e UserNotFoundError) Error() string {
-	return fmt.Sprintf("User '%d' not found", e.UID)
+	return fmt.Sprintf("User '%s' not found", e.Identifier)
+}
+
+type UserAlreadyExistsError struct {
+	Identifier string
+	Cause      error
+}
+
+func (e UserAlreadyExistsError) Error() string {
+	return fmt.Sprintf("User '%s' already exists", e.Identifier)
 }
 
 type User struct {
@@ -42,6 +51,7 @@ type UserRepository interface {
 	FindActive(time.Time) ([]User, error)
 	FindInactive(time.Time) ([]User, error)
 	FindById(context.Context, int64) (User, error)
+	FindByName(string) (User, error)
 	StoreUser(User) (User, error)
 	UpdateUser(context.Context, User) error
 	DeleteById(int64) error

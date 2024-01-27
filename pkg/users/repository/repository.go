@@ -3,6 +3,7 @@ package repository
 import (
 	"context"
 	"database/sql"
+	"strconv"
 	"time"
 
 	"github.com/nerdbergev/shoppinglist-go/pkg/database"
@@ -117,7 +118,10 @@ func (r Repository) FindById(ctx context.Context, id int64) (domain.User, error)
 	u, err := processRow(row)
 	if err != nil {
 		if err == sql.ErrNoRows {
-			return domain.User{}, errors.Wrap(domain.UserNotFoundError{UID: id}, err.Error())
+			return domain.User{}, errors.Wrap(
+				domain.UserNotFoundError{Identifier: strconv.FormatInt(id, 10)},
+				err.Error(),
+			)
 		}
 		return domain.User{}, errors.Wrap(domain.ErrPersistanceError, err.Error())
 	}

@@ -63,6 +63,10 @@ type CreateUserRequest interface {
 }
 
 func (svc Service) CreateUser(req CreateUserRequest) (domain.User, error) {
+	_, err := svc.repo.FindByName(req.Name())
+	if err == nil {
+		return domain.User{}, domain.UserAlreadyExistsError{Identifier: req.Name()}
+	}
 	u := domain.User{
 		Name:    req.Name(),
 		Created: time.Now(),

@@ -2,16 +2,35 @@ package rest
 
 import (
 	"errors"
+	"fmt"
 	"net/http"
 	"sort"
 	"strconv"
+	"strings"
 	"time"
+	"unicode"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/render"
 	"github.com/nerdbergev/shoppinglist-go/pkg/users"
 	"github.com/nerdbergev/shoppinglist-go/pkg/users/domain"
 )
+
+type ParameterMissingError struct {
+	Name string
+}
+
+func (err ParameterMissingError) Error() string {
+	return "" // we don't really need the Error function.
+}
+
+type ParameterInvalidError struct {
+	Name string
+}
+
+func (err ParameterInvalidError) Error() string {
+	return "" // we don't really need the Error function.
+}
 
 type Handler struct {
 	svc users.Service
@@ -27,18 +46,13 @@ func (h Handler) FindById(w http.ResponseWriter, r *http.Request) {
 	idParam := chi.URLParam(r, "id")
 	id, err := strconv.ParseInt(idParam, 10, 64)
 	if err != nil {
-		_ = render.Render(w, r, ErrServerError(err))
+		_ = render.Render(w, r, ErrInvalidParamter("id"))
 		return
 	}
 
 	user, err := h.svc.FindById(id)
 	if err != nil {
-		var derr domain.UserNotFoundError
-		if errors.As(err, &derr) {
-			_ = render.Render(w, r, ErrUserNotFound(derr))
-			return
-		}
-		_ = render.Render(w, r, ErrServerError(err))
+		h.renderError(w, r, err)
 		return
 	}
 	_ = render.Render(w, r, NewUserResponse(user))
@@ -67,7 +81,7 @@ func (h Handler) GetAll(w http.ResponseWriter, r *http.Request) {
 	} else {
 		isActive, perr := strconv.ParseBool(activeParam)
 		if perr != nil {
-			_ = render.Render(w, r, ErrServerError(perr))
+			_ = render.Render(w, r, ErrInvalidParamter("active"))
 			return
 		}
 		users, err = h.svc.FindByState(getAllRequest{active: isActive})
@@ -87,17 +101,40 @@ func (h Handler) GetAll(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h Handler) CreateUser(w http.ResponseWriter, r *http.Request) {
-	uReq := &UserRequest{}
+	uReq := &CreateUserRequest{}
 	if err := render.Bind(r, uReq); err != nil {
-		_ = render.Render(w, r, ErrInvalidRequest(err))
+		h.renderError(w, r, err)
 		return
 	}
 
 	created, err := h.svc.CreateUser(uReq)
 	if err != nil {
-		_ = render.Render(w, r, ErrServerError(err))
+		h.renderError(w, r, err)
+		return
 	}
 	render.JSON(w, r, NewUserResponse(created))
+}
+
+func (h Handler) renderError(w http.ResponseWriter, r *http.Request, err error) {
+	var (
+		unfErr domain.UserNotFoundError
+		aeErr  domain.UserAlreadyExistsError
+		pmErr  ParameterMissingError
+		piErr  ParameterInvalidError
+	)
+
+	switch {
+	case errors.As(err, &unfErr):
+		_ = render.Render(w, r, ErrUserNotFound(unfErr))
+	case errors.As(err, &aeErr):
+		_ = render.Render(w, r, ErrUserAlreadyExists(aeErr))
+	case errors.As(err, &pmErr):
+		_ = render.Render(w, r, ErrMissingParameter(pmErr.Name))
+	case errors.As(err, &piErr):
+		_ = render.Render(w, r, ErrInvalidParamter(piErr.Name))
+	default:
+		_ = render.Render(w, r, ErrServerError(err))
+	}
 }
 
 func NewUserListResponse(users []domain.User) UserListResponse {
@@ -162,16 +199,40 @@ type Error struct {
 }
 
 type ErrResponse struct {
-	Error Error `json:"error"`
+	StatusCode int   `json:"-"`
+	Error      Error `json:"error"`
 }
 
 func (e *ErrResponse) Render(w http.ResponseWriter, r *http.Request) error {
-	render.Status(r, e.Error.Code)
+	render.Status(r, e.StatusCode)
 	return nil
+}
+
+func ErrInvalidParamter(name string) render.Renderer {
+	return &ErrResponse{
+		StatusCode: http.StatusBadRequest,
+		Error: Error{
+			Code:    http.StatusBadRequest,
+			Class:   "App\\Exception\\ParameterInvalidException",
+			Message: fmt.Sprintf("Parameter '%s' is invalid", name),
+		},
+	}
+}
+
+func ErrMissingParameter(name string) render.Renderer {
+	return &ErrResponse{
+		StatusCode: http.StatusBadRequest,
+		Error: Error{
+			Code:    http.StatusBadRequest,
+			Class:   "App\\Exception\\ParameterMissingException",
+			Message: fmt.Sprintf("Parameter '%s' is missing", name),
+		},
+	}
 }
 
 func ErrInvalidRequest(err error) render.Renderer {
 	return &ErrResponse{
+		StatusCode: http.StatusBadRequest,
 		Error: Error{
 			Code:    http.StatusBadRequest,
 			Message: err.Error(),
@@ -181,9 +242,21 @@ func ErrInvalidRequest(err error) render.Renderer {
 
 func ErrUserNotFound(err domain.UserNotFoundError) render.Renderer {
 	return &ErrResponse{
+		StatusCode: http.StatusNotFound,
 		Error: Error{
 			Class:   "App\\Exception\\UserNotFoundException",
 			Code:    http.StatusNotFound,
+			Message: err.Error(),
+		},
+	}
+}
+
+func ErrUserAlreadyExists(err domain.UserAlreadyExistsError) render.Renderer {
+	return &ErrResponse{
+		StatusCode: http.StatusInternalServerError,
+		Error: Error{
+			Class:   "App\\Exception\\UserAlreadyExistsException",
+			Code:    209,
 			Message: err.Error(),
 		},
 	}
@@ -198,29 +271,41 @@ func ErrServerError(err error) render.Renderer {
 	}
 }
 
-type UserRequest struct {
-	NameParam  string  `json:"name"`
+type CreateUserRequest struct {
+	NameParam  *string `json:"name"`
 	EmailParam *string `json:"email"`
 }
 
-func (u UserRequest) Bind(r *http.Request) error {
-	if u.NameParam == "" {
-		return errors.New("missing required User fields.")
+func (u *CreateUserRequest) Bind(r *http.Request) error {
+	if u.NameParam == nil {
+		return ParameterMissingError{Name: "name"}
 	}
+	// Trim and remove non-printable characters
+	*u.NameParam = strings.Map(func(r rune) rune {
+		if unicode.IsPrint(r) {
+			return r
+		}
+		return -1
+	}, strings.TrimSpace(*u.NameParam))
+
+	if *u.NameParam == "" || len(*u.NameParam) > 64 {
+		return ParameterInvalidError{Name: "name"}
+	}
+
 	return nil
 }
 
-func (u UserRequest) Name() string {
-	return u.NameParam
+func (u CreateUserRequest) Name() string {
+	return *u.NameParam
 }
 
-func (u UserRequest) Email() string {
+func (u CreateUserRequest) Email() string {
 	if u.HasEmail() {
 		return *u.EmailParam
 	}
 	return ""
 }
 
-func (u UserRequest) HasEmail() bool {
+func (u CreateUserRequest) HasEmail() bool {
 	return u.EmailParam != nil
 }
