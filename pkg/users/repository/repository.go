@@ -6,8 +6,8 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/nerdbergev/shoppinglist-go/pkg/database"
-	"github.com/nerdbergev/shoppinglist-go/pkg/users/domain"
+	"github.com/nerdbergev/strichliste-go/pkg/database"
+	"github.com/nerdbergev/strichliste-go/pkg/users/domain"
 	"github.com/pkg/errors"
 )
 

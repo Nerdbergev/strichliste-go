@@ -1,4 +1,4 @@
-module github.com/nerdbergev/shoppinglist-go
+module github.com/nerdbergev/strichliste-go
 
 go 1.21.5
 

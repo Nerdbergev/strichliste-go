@@ -19,6 +19,10 @@ func (a *Article) IncrementUsageCount() {
 	a.UsageCount += 1
 }
 
+func (a *Article) DecrementUsageCount() {
+	a.UsageCount -= 1
+}
+
 type ArticleRepository interface {
 	GetAll(bool) ([]Article, error)
 	FindById(context.Context, int64) (Article, error)

@@ -4,9 +4,9 @@ import (
 	"database/sql"
 	"time"
 
-	adomain "github.com/nerdbergev/shoppinglist-go/pkg/articles/domain"
-	"github.com/nerdbergev/shoppinglist-go/pkg/transactions/domain"
-	udomain "github.com/nerdbergev/shoppinglist-go/pkg/users/domain"
+	adomain "github.com/nerdbergev/strichliste-go/pkg/articles/domain"
+	"github.com/nerdbergev/strichliste-go/pkg/transactions/domain"
+	udomain "github.com/nerdbergev/strichliste-go/pkg/users/domain"
 )
 
 type Transaction struct {

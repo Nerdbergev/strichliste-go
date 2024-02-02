@@ -8,8 +8,8 @@ import (
 	"time"
 
 	"github.com/go-chi/render"
-	"github.com/nerdbergev/shoppinglist-go/pkg/articles"
-	"github.com/nerdbergev/shoppinglist-go/pkg/articles/domain"
+	"github.com/nerdbergev/strichliste-go/pkg/articles"
+	"github.com/nerdbergev/strichliste-go/pkg/articles/domain"
 )
 
 type Handler struct {

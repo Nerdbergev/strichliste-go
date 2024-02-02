@@ -5,8 +5,8 @@ import (
 	"database/sql"
 	"time"
 
-	"github.com/nerdbergev/shoppinglist-go/pkg/articles/domain"
-	"github.com/nerdbergev/shoppinglist-go/pkg/database"
+	"github.com/nerdbergev/strichliste-go/pkg/articles/domain"
+	"github.com/nerdbergev/strichliste-go/pkg/database"
 )
 
 type Article struct {

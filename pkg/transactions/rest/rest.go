@@ -8,10 +8,10 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/render"
-	adomain "github.com/nerdbergev/shoppinglist-go/pkg/articles/domain"
-	"github.com/nerdbergev/shoppinglist-go/pkg/transactions"
-	"github.com/nerdbergev/shoppinglist-go/pkg/transactions/domain"
-	udomain "github.com/nerdbergev/shoppinglist-go/pkg/users/domain"
+	adomain "github.com/nerdbergev/strichliste-go/pkg/articles/domain"
+	"github.com/nerdbergev/strichliste-go/pkg/transactions"
+	"github.com/nerdbergev/strichliste-go/pkg/transactions/domain"
+	udomain "github.com/nerdbergev/strichliste-go/pkg/users/domain"
 )
 
 type Handler struct {
@@ -25,7 +25,7 @@ func NewHandler(svc transactions.Service) Handler {
 }
 
 func (h Handler) GetUserTransactions(w http.ResponseWriter, r *http.Request) {
-	uidParam := chi.URLParam(r, "id")
+	uidParam := chi.URLParam(r, "uid")
 	uid, err := strconv.ParseInt(uidParam, 10, 64)
 	if err != nil {
 		_ = render.Render(w, r, ErrRender(err))
@@ -47,7 +47,7 @@ func (h Handler) GetUserTransactions(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h Handler) CreateTransaction(w http.ResponseWriter, r *http.Request) {
-	uid, err := parseInt64(chi.URLParam(r, "id"))
+	uid, err := strconv.ParseInt(chi.URLParam(r, "uid"), 10, 64)
 	if err != nil {
 		_ = render.Render(w, r, ErrRender(err))
 		return
@@ -65,6 +65,21 @@ func (h Handler) CreateTransaction(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	_ = render.Render(w, r, NewTransactionResponse(tr))
+}
+
+func (h Handler) DeleteTransaction(w http.ResponseWriter, r *http.Request) {
+	tid, err := strconv.ParseInt(chi.URLParam(r, "tid"), 10, 64)
+	if err != nil {
+		_ = render.Render(w, r, ErrRender(err))
+		return
+	}
+	reverted, err := h.svc.RevertTransaction(tid)
+	if err != nil {
+		_ = render.Render(w, r, ErrRender(err))
+		return
+	}
+
+	_ = render.Render(w, r, NewTransactionResponse(reverted))
 }
 
 func NewTransactionResponse(t domain.Transaction) TransactionResponse {
@@ -234,8 +249,4 @@ func (u TransactionRequest) Bind(r *http.Request) error {
 		return errors.New("invalid comment")
 	}
 	return nil
-}
-
-func parseInt64(s string) (int64, error) {
-	return strconv.ParseInt(s, 10, 64)
 }

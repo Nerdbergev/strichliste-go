@@ -5,10 +5,10 @@ import (
 	"errors"
 	"time"
 
-	adomain "github.com/nerdbergev/shoppinglist-go/pkg/articles/domain"
-	"github.com/nerdbergev/shoppinglist-go/pkg/settings"
-	"github.com/nerdbergev/shoppinglist-go/pkg/transactions/domain"
-	udomain "github.com/nerdbergev/shoppinglist-go/pkg/users/domain"
+	adomain "github.com/nerdbergev/strichliste-go/pkg/articles/domain"
+	"github.com/nerdbergev/strichliste-go/pkg/settings"
+	"github.com/nerdbergev/strichliste-go/pkg/transactions/domain"
+	udomain "github.com/nerdbergev/strichliste-go/pkg/users/domain"
 )
 
 var (
@@ -44,9 +44,8 @@ func (svc Service) GetFromUser(uid int64) ([]domain.Transaction, error) {
 }
 
 func (svc Service) ProcessTransaction(uid, amount int64, comment *string, quantity, articleID, recipientID *int64) (domain.Transaction, error) {
-	ctx := context.Background()
 	var processed domain.Transaction
-	err := svc.repo.Transaction(ctx, func(ctx context.Context) error {
+	err := svc.repo.Transactional(context.Background(), func(ctx context.Context) error {
 		if (recipientID != nil || articleID != nil) && amount > 0 {
 			return ErrTransactionInvalid
 		}
@@ -151,6 +150,67 @@ func (svc Service) ProcessTransaction(uid, amount int64, comment *string, quanti
 	}
 	processed.IsDeletable = svc.isDeletable(processed)
 	return processed, nil
+}
+
+func (svc Service) RevertTransaction(tid int64) (domain.Transaction, error) {
+	var reverted domain.Transaction
+	if err := svc.repo.Transactional(context.Background(), func(ctx context.Context) error {
+		toRevert, err := svc.repo.FindById(ctx, tid)
+		if err != nil {
+			return err
+		}
+
+		if toRevert.Article != nil {
+			toRevert.Article.DecrementUsageCount()
+			if err := svc.arepo.UpdateArticle(ctx, *toRevert.Article); err != nil {
+				return err
+			}
+		}
+
+		if toRevert.RecipientTransaction != nil {
+			if err := svc.undoTransaction(ctx, *toRevert.RecipientTransaction); err != nil {
+				return err
+			}
+		}
+
+		if toRevert.SenderTransaction != nil {
+			if err := svc.undoTransaction(ctx, *toRevert.SenderTransaction); err != nil {
+				return err
+			}
+		}
+		reverted = toRevert
+		return svc.undoTransaction(ctx, toRevert)
+	}); err != nil {
+		return domain.Transaction{}, err
+	}
+	reverted.IsDeleted = true
+	return reverted, nil
+}
+
+func (svc Service) undoTransaction(ctx context.Context, t domain.Transaction) error {
+	user := t.User
+	if err := svc.checkTransactionBoundary(t.Amount); err != nil {
+		return err
+	}
+
+	user.AddBalance(t.Amount * -1)
+	if err := svc.checkAccountBalanceBoundary(user); err != nil {
+		return err
+	}
+
+	undoEnabled, ok := svc.settings.GetBool("payment.undo.delete")
+	if ok && undoEnabled {
+		if err := svc.repo.DeleteById(ctx, t.ID); err != nil {
+			return err
+		}
+	} else {
+		t.IsDeleted = true
+		if err := svc.repo.MarkDeleted(ctx, t.ID); err != nil {
+			return err
+		}
+	}
+
+	return svc.urepo.UpdateUser(ctx, user)
 }
 
 func (svc Service) checkAccountBalanceBoundary(user udomain.User) error {

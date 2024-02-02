@@ -13,8 +13,8 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/render"
-	"github.com/nerdbergev/shoppinglist-go/pkg/users"
-	"github.com/nerdbergev/shoppinglist-go/pkg/users/domain"
+	"github.com/nerdbergev/strichliste-go/pkg/users"
+	"github.com/nerdbergev/strichliste-go/pkg/users/domain"
 )
 
 type ParameterMissingError struct {

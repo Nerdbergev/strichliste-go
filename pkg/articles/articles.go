@@ -1,6 +1,6 @@
 package articles
 
-import "github.com/nerdbergev/shoppinglist-go/pkg/articles/domain"
+import "github.com/nerdbergev/strichliste-go/pkg/articles/domain"
 
 func NewService(repo domain.ArticleRepository) Service {
 	return Service{repo: repo}

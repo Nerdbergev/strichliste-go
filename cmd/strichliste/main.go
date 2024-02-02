@@ -9,16 +9,16 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/go-chi/render"
-	"github.com/nerdbergev/shoppinglist-go/pkg/articles"
-	arepo "github.com/nerdbergev/shoppinglist-go/pkg/articles/repository"
-	arest "github.com/nerdbergev/shoppinglist-go/pkg/articles/rest"
-	"github.com/nerdbergev/shoppinglist-go/pkg/settings"
-	"github.com/nerdbergev/shoppinglist-go/pkg/transactions"
-	trepo "github.com/nerdbergev/shoppinglist-go/pkg/transactions/repository"
-	trest "github.com/nerdbergev/shoppinglist-go/pkg/transactions/rest"
-	"github.com/nerdbergev/shoppinglist-go/pkg/users"
-	urepo "github.com/nerdbergev/shoppinglist-go/pkg/users/repository"
-	urest "github.com/nerdbergev/shoppinglist-go/pkg/users/rest"
+	"github.com/nerdbergev/strichliste-go/pkg/articles"
+	arepo "github.com/nerdbergev/strichliste-go/pkg/articles/repository"
+	arest "github.com/nerdbergev/strichliste-go/pkg/articles/rest"
+	"github.com/nerdbergev/strichliste-go/pkg/settings"
+	"github.com/nerdbergev/strichliste-go/pkg/transactions"
+	trepo "github.com/nerdbergev/strichliste-go/pkg/transactions/repository"
+	trest "github.com/nerdbergev/strichliste-go/pkg/transactions/rest"
+	"github.com/nerdbergev/strichliste-go/pkg/users"
+	urepo "github.com/nerdbergev/strichliste-go/pkg/users/repository"
+	urest "github.com/nerdbergev/strichliste-go/pkg/users/rest"
 	"gopkg.in/yaml.v3"
 
 	_ "github.com/mattn/go-sqlite3"
@@ -70,11 +70,12 @@ func main() {
 	r.Route("/api", func(r chi.Router) {
 		r.Route("/user", func(r chi.Router) {
 			r.Get("/", uh.GetAll)
-			r.Get("/{id}", uh.FindById)
-			r.Post("/{id}", uh.UpdateUser)
-			r.Route("/{id}/transaction", func(r chi.Router) {
+			r.Get("/{uid}", uh.FindById)
+			r.Post("/{uid}", uh.UpdateUser)
+			r.Route("/{uid}/transaction", func(r chi.Router) {
 				r.Get("/", th.GetUserTransactions)
 				r.Post("/", th.CreateTransaction)
+				r.Delete("/{tid}", th.DeleteTransaction)
 			})
 			r.Post("/", uh.CreateUser)
 		})

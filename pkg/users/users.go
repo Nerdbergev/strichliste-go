@@ -5,8 +5,8 @@ import (
 	"errors"
 	"time"
 
-	"github.com/nerdbergev/shoppinglist-go/pkg/settings"
-	"github.com/nerdbergev/shoppinglist-go/pkg/users/domain"
+	"github.com/nerdbergev/strichliste-go/pkg/settings"
+	"github.com/nerdbergev/strichliste-go/pkg/users/domain"
 )
 
 func NewService(settings settings.Service, repo domain.UserRepository) (Service, error) {
