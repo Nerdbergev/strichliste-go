@@ -104,8 +104,8 @@ func (r Repository) Transactional(ctx context.Context, f func(ctx context.Contex
 func (r Repository) StoreTransaction(ctx context.Context,
 	t domain.Transaction) (domain.Transaction, error) {
 	query := `INSERT INTO transactions
-                (amount, user_id, created, article_id, deleted, recipient_transaction_id)
-                VALUES ($1, $2, $3, $4, false, $5)`
+                (amount, user_id, created, article_id, deleted, recipient_transaction_id, comment)
+                VALUES ($1, $2, $3, $4, false, $5, $6)`
 	var (
 		articleID              *int64
 		recipientTransactionID *int64
@@ -117,7 +117,7 @@ func (r Repository) StoreTransaction(ctx context.Context,
 		recipientTransactionID = &t.RecipientTransaction.ID
 	}
 	res, err := r.getDB(ctx).
-		Exec(query, t.Amount, t.User.ID, t.Created, articleID, recipientTransactionID)
+		Exec(query, t.Amount, t.User.ID, t.Created, articleID, recipientTransactionID, t.Comment)
 	if err != nil {
 		return domain.Transaction{}, err
 	}

@@ -59,7 +59,7 @@ func (h Handler) CreateTransaction(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	tr, err := h.svc.ProcessTransaction(uid, data.Amount, nil, nil, data.ArticleID, data.RecipientID)
+	tr, err := h.svc.ProcessTransaction(uid, data.Amount, data.Comment, data.Quantity, data.ArticleID, data.RecipientID)
 	if err != nil {
 		_ = render.Render(w, r, ErrRender(err))
 		return
@@ -237,15 +237,15 @@ func ErrRender(err error) render.Renderer {
 }
 
 type TransactionRequest struct {
-	Amount      int64  `json:"amount"`
-	Quantity    *int64 `json:"quantity"`
-	Comment     string `json:"comment"`
-	RecipientID *int64 `json:"recipientId"`
-	ArticleID   *int64 `json:"articleId"`
+	Amount      int64   `json:"amount"`
+	Quantity    *int64  `json:"quantity"`
+	Comment     *string `json:"comment"`
+	RecipientID *int64  `json:"recipientId"`
+	ArticleID   *int64  `json:"articleId"`
 }
 
 func (u TransactionRequest) Bind(r *http.Request) error {
-	if len(u.Comment) > 255 {
+	if len(*u.Comment) > 255 {
 		return errors.New("invalid comment")
 	}
 	return nil

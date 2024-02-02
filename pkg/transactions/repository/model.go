@@ -54,12 +54,12 @@ func mapTransactionToDomain(t Transaction) domain.Transaction {
 
 	if t.Quantity.Valid {
 		dt.Quantity = new(int64)
-		dt.Quantity = &t.Quantity.Int64
+		*dt.Quantity = t.Quantity.Int64
 	}
 
 	if t.Comment.Valid {
 		dt.Comment = new(string)
-		dt.Comment = &t.Comment.String
+		*dt.Comment = t.Comment.String
 	}
 
 	if t.Article != nil {
