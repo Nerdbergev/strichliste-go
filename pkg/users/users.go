@@ -56,13 +56,14 @@ func (svc Service) FindByState(req FindByStateRequest) ([]domain.User, error) {
 	return svc.repo.FindInactive(svc.GetStaleDateTime())
 }
 
-type CreateUserRequest interface {
+type UserRequest interface {
 	Name() string
 	Email() string
 	HasEmail() bool
+	IsDisabled() bool
 }
 
-func (svc Service) CreateUser(req CreateUserRequest) (domain.User, error) {
+func (svc Service) CreateUser(req UserRequest) (domain.User, error) {
 	_, err := svc.repo.FindByName(req.Name())
 	if err == nil {
 		return domain.User{}, domain.UserAlreadyExistsError{Identifier: req.Name()}
@@ -78,8 +79,27 @@ func (svc Service) CreateUser(req CreateUserRequest) (domain.User, error) {
 	return svc.repo.StoreUser(u)
 }
 
+func (svc Service) UpdateUser(uid int64, req UserRequest) (domain.User, error) {
+	user, err := svc.FindById(uid)
+	if err != nil {
+		return domain.User{}, err
+	}
+
+	user.Name = req.Name()
+	user.IsDisabled = req.IsDisabled()
+	if req.HasEmail() {
+		user.Email = new(string)
+		*user.Email = req.Email()
+	}
+	err = svc.repo.UpdateUser(context.Background(), user)
+	if err != nil {
+		return domain.User{}, err
+	}
+	return user, nil
+}
+
 func (svc Service) FindById(uid int64) (domain.User, error) {
-	return svc.repo.FindById(context.TODO(), uid)
+	return svc.repo.FindById(context.Background(), uid)
 }
 
 func (svc Service) GetStaleDateTime() time.Time {

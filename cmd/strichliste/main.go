@@ -71,6 +71,7 @@ func main() {
 		r.Route("/user", func(r chi.Router) {
 			r.Get("/", uh.GetAll)
 			r.Get("/{id}", uh.FindById)
+			r.Post("/{id}", uh.UpdateUser)
 			r.Route("/{id}/transaction", func(r chi.Router) {
 				r.Get("/", th.GetUserTransactions)
 				r.Post("/", th.CreateTransaction)

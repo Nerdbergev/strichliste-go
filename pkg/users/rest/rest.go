@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"net/mail"
 	"sort"
 	"strconv"
 	"strings"
@@ -101,7 +102,7 @@ func (h Handler) GetAll(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h Handler) CreateUser(w http.ResponseWriter, r *http.Request) {
-	uReq := &CreateUserRequest{}
+	uReq := new(UserRequest)
 	if err := render.Bind(r, uReq); err != nil {
 		h.renderError(w, r, err)
 		return
@@ -113,6 +114,28 @@ func (h Handler) CreateUser(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	render.JSON(w, r, NewUserResponse(created))
+}
+
+func (h Handler) UpdateUser(w http.ResponseWriter, r *http.Request) {
+	idParam := chi.URLParam(r, "id")
+	id, err := strconv.ParseInt(idParam, 10, 64)
+	if err != nil {
+		_ = render.Render(w, r, ErrInvalidParamter("id"))
+		return
+	}
+
+	uReq := new(UserRequest)
+	if err := render.Bind(r, uReq); err != nil {
+		h.renderError(w, r, err)
+		return
+	}
+
+	updated, err := h.svc.UpdateUser(id, uReq)
+	if err != nil {
+		h.renderError(w, r, err)
+		return
+	}
+	render.JSON(w, r, NewUserResponse(updated))
 }
 
 func (h Handler) renderError(w http.ResponseWriter, r *http.Request, err error) {
@@ -271,12 +294,13 @@ func ErrServerError(err error) render.Renderer {
 	}
 }
 
-type CreateUserRequest struct {
-	NameParam  *string `json:"name"`
-	EmailParam *string `json:"email"`
+type UserRequest struct {
+	NameParam       *string `json:"name"`
+	EmailParam      *string `json:"email"`
+	IsDisabledParam *bool   `json:"isDisabled"`
 }
 
-func (u *CreateUserRequest) Bind(r *http.Request) error {
+func (u *UserRequest) Bind(r *http.Request) error {
 	if u.NameParam == nil {
 		return ParameterMissingError{Name: "name"}
 	}
@@ -292,20 +316,30 @@ func (u *CreateUserRequest) Bind(r *http.Request) error {
 		return ParameterInvalidError{Name: "name"}
 	}
 
+	if u.EmailParam != nil {
+		if _, err := mail.ParseAddress(*u.EmailParam); err != nil {
+			return ParameterInvalidError{Name: "email"}
+		}
+	}
+
 	return nil
 }
 
-func (u CreateUserRequest) Name() string {
+func (u UserRequest) Name() string {
 	return *u.NameParam
 }
 
-func (u CreateUserRequest) Email() string {
+func (u UserRequest) Email() string {
 	if u.HasEmail() {
 		return *u.EmailParam
 	}
 	return ""
 }
 
-func (u CreateUserRequest) HasEmail() bool {
+func (u UserRequest) HasEmail() bool {
 	return u.EmailParam != nil
+}
+
+func (u UserRequest) IsDisabled() bool {
+	return u.IsDisabledParam != nil && *u.IsDisabledParam
 }
