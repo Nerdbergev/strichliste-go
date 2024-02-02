@@ -44,7 +44,7 @@ func NewHandler(svc users.Service) Handler {
 }
 
 func (h Handler) FindById(w http.ResponseWriter, r *http.Request) {
-	idParam := chi.URLParam(r, "id")
+	idParam := chi.URLParam(r, "uid")
 	id, err := strconv.ParseInt(idParam, 10, 64)
 	if err != nil {
 		_ = render.Render(w, r, ErrInvalidParamter("id"))
@@ -117,7 +117,7 @@ func (h Handler) CreateUser(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h Handler) UpdateUser(w http.ResponseWriter, r *http.Request) {
-	idParam := chi.URLParam(r, "id")
+	idParam := chi.URLParam(r, "uid")
 	id, err := strconv.ParseInt(idParam, 10, 64)
 	if err != nil {
 		_ = render.Render(w, r, ErrInvalidParamter("id"))
@@ -296,7 +296,7 @@ func ErrServerError(err error) render.Renderer {
 
 type UserRequest struct {
 	NameParam       *string `json:"name"`
-	EmailParam      *string `json:"email"`
+	EmailParam      *string `json:"email,omitempty"`
 	IsDisabledParam *bool   `json:"isDisabled"`
 }
 
@@ -316,7 +316,7 @@ func (u *UserRequest) Bind(r *http.Request) error {
 		return ParameterInvalidError{Name: "name"}
 	}
 
-	if u.EmailParam != nil {
+	if u.EmailParam != nil && *u.EmailParam != "" {
 		if _, err := mail.ParseAddress(*u.EmailParam); err != nil {
 			return ParameterInvalidError{Name: "email"}
 		}
