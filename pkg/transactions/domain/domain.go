@@ -18,6 +18,7 @@ type Transaction struct {
 	Comment              *string
 	Amount               int64
 	IsDeleted            bool
+	IsDeletable          bool
 	Created              time.Time
 }
 

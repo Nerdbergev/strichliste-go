@@ -10,11 +10,11 @@ import (
 )
 
 func NewService(settings settings.Service, repo domain.UserRepository) (Service, error) {
-	sp, ok := settings.Get("user.stalePeriod").(string)
+	sp, ok := settings.GetString("user.stalePeriod")
 	if !ok {
 		return Service{}, errors.New("user.stalePeriod is not a string")
 	}
-	// Ignore error since the setting is validated during service start up
+
 	dur, err := time.ParseDuration(sp)
 	if err != nil {
 		return Service{}, errors.New("failed to parse user.stalePeriod duration")

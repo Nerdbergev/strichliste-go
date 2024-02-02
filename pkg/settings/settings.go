@@ -43,6 +43,26 @@ func (svc Service) GetInt(k string) (int, bool) {
 	return v, ok
 }
 
+func (svc Service) GetString(k string) (string, bool) {
+	val := svc.Get(k)
+	if val == nil {
+		return "", false
+	}
+
+	v, ok := val.(string)
+	return v, ok
+}
+
+func (svc Service) GetBool(k string) (bool, bool) {
+	val := svc.Get(k)
+	if val == nil {
+		return false, false
+	}
+
+	v, ok := val.(bool)
+	return v, ok
+}
+
 type Handler struct {
 	settings Service
 }

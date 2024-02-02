@@ -35,7 +35,7 @@ parameters:
             undo:
                 enabled: true
                 delete: false
-                timeout: '5 minute' # See http://de.php.net/manual/en/datetime.formats.relative.php
+                timeout: '5m'
 
             boundary:
                 upper: 15000

@@ -100,11 +100,12 @@ func (tr TransactionListResponse) Render(w http.ResponseWriter, r *http.Request)
 func MapTransaction(t domain.Transaction) Transaction {
 
 	resp := Transaction{
-		ID:        t.ID,
-		User:      MapUser(t.User),
-		Amount:    t.Amount,
-		IsDeleted: t.IsDeleted,
-		Created:   t.Created.Format("2006-01-02 15:04:05"),
+		ID:           t.ID,
+		User:         MapUser(t.User),
+		Amount:       t.Amount,
+		IsDeleted:    t.IsDeleted,
+		IsDeleteable: t.IsDeletable,
+		Created:      t.Created.Format("2006-01-02 15:04:05"),
 	}
 	if t.Comment != nil {
 		resp.Comment = *t.Comment

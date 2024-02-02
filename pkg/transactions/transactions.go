@@ -33,7 +33,14 @@ type Service struct {
 }
 
 func (svc Service) GetFromUser(uid int64) ([]domain.Transaction, error) {
-	return svc.repo.FindByUserId(uid)
+	transactions, err := svc.repo.FindByUserId(uid)
+	if err != nil {
+		return nil, err
+	}
+	for i := range transactions {
+		transactions[i].IsDeletable = svc.isDeletable(transactions[i])
+	}
+	return transactions, nil
 }
 
 func (svc Service) ProcessTransaction(uid, amount int64, comment *string, quantity, articleID, recipientID *int64) (domain.Transaction, error) {
@@ -142,6 +149,7 @@ func (svc Service) ProcessTransaction(uid, amount int64, comment *string, quanti
 	if err != nil {
 		return domain.Transaction{}, err
 	}
+	processed.IsDeletable = svc.isDeletable(processed)
 	return processed, nil
 }
 
@@ -170,4 +178,27 @@ func (svc Service) checkTransactionBoundary(amount int64) error {
 		return errors.New("Transaction Boundary error")
 	}
 	return nil
+}
+
+func (svc Service) isDeletable(t domain.Transaction) bool {
+	if t.IsDeleted {
+		return false
+	}
+
+	undoEnabled, ok := svc.settings.GetBool("payment.undo.enabled")
+	if !ok || !undoEnabled {
+		return false
+	}
+
+	deletionTimeout, ok := svc.settings.GetString("payment.undo.timeout")
+	if !ok {
+		return false
+	}
+
+	dur, err := time.ParseDuration(deletionTimeout)
+	if err != nil {
+		return false
+	}
+
+	return time.Now().Before(t.Created.Add(dur))
 }
