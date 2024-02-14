@@ -3,6 +3,8 @@ package repository
 import (
 	"context"
 	"database/sql"
+	"errors"
+	"strconv"
 	"time"
 
 	"github.com/nerdbergev/strichliste-go/pkg/articles/domain"
@@ -43,7 +45,13 @@ func (r Repository) GetAll(onlyActive bool) ([]domain.Article, error) {
 
 func (r Repository) FindById(ctx context.Context, aid int64) (domain.Article, error) {
 	row := r.getDB(ctx).QueryRow("SELECT * FROM article WHERE id = ?", aid)
-	return processRow(row)
+	article, err := processRow(row)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return domain.Article{}, domain.ArticleNotFoundError{Identifier: strconv.FormatInt(aid, 10)}
+		}
+	}
+	return article, nil
 }
 
 func (r Repository) FindByBarcode(string) (domain.Article, error) {

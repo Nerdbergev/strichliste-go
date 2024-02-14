@@ -14,6 +14,14 @@ import (
 	udomain "github.com/nerdbergev/strichliste-go/pkg/users/domain"
 )
 
+type ParameterInvalidError struct {
+	Name string
+}
+
+func (err ParameterInvalidError) Error() string {
+	return "" // we don't really need the Error function.
+}
+
 type Handler struct {
 	svc transactions.Service
 }
@@ -246,7 +254,7 @@ type TransactionRequest struct {
 
 func (u TransactionRequest) Bind(r *http.Request) error {
 	if len(*u.Comment) > 255 {
-		return errors.New("invalid comment")
+		return ParameterInvalidError{Name: "comment"}
 	}
 	return nil
 }

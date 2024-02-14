@@ -2,8 +2,26 @@ package domain
 
 import (
 	"context"
+	"fmt"
 	"time"
 )
+
+type ArticleNotFoundError struct {
+	Identifier string
+}
+
+func (err ArticleNotFoundError) Error() string {
+	return fmt.Sprintf("Article '%s' not found", err.Identifier)
+}
+
+type ArticleInactiveError struct {
+	Name string
+	Id   int64
+}
+
+func (err ArticleInactiveError) Error() string {
+	return fmt.Sprintf("Article '%s' (%d) is inactive", err.Name, err.Id)
+}
 
 type Article struct {
 	ID         int64

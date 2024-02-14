@@ -47,7 +47,7 @@ func (svc Service) ProcessTransaction(uid, amount int64, comment *string, quanti
 	var processed domain.Transaction
 	err := svc.repo.Transactional(context.Background(), func(ctx context.Context) error {
 		if (recipientID != nil || articleID != nil) && amount > 0 {
-			return ErrTransactionInvalid
+			return domain.TransactionInvalidError{Msg: "Amout can't be positive when sending money or buying an article"}
 		}
 
 		user, err := svc.urepo.FindById(ctx, uid)
@@ -68,7 +68,7 @@ func (svc Service) ProcessTransaction(uid, amount int64, comment *string, quanti
 				return err
 			}
 			if !article.IsActive {
-				return errors.New("article inactive")
+				return adomain.ArticleInactiveError{Name: article.Name, Id: article.ID}
 			}
 			t.Article = &article
 			if quantity == nil {
@@ -216,12 +216,12 @@ func (svc Service) undoTransaction(ctx context.Context, t domain.Transaction) er
 func (svc Service) checkAccountBalanceBoundary(user udomain.User) error {
 	upper, ok := svc.settings.GetInt("account.boundary.upper")
 	if ok && int64(upper) < user.Balance {
-		return errors.New("Account Balance error")
+		return domain.AccountBalanceBoundaryException{Amount: user.Balance, UID: user.ID, Boundary: int64(upper)}
 	}
 
 	lower, ok := svc.settings.GetInt("account.boundary.lower")
 	if ok && user.Balance < int64(lower) {
-		return errors.New("Account Balance error")
+		return domain.AccountBalanceBoundaryException{Amount: user.Balance, UID: user.ID, Boundary: int64(lower)}
 	}
 
 	return nil
@@ -230,12 +230,12 @@ func (svc Service) checkAccountBalanceBoundary(user udomain.User) error {
 func (svc Service) checkTransactionBoundary(amount int64) error {
 	upper, ok := svc.settings.GetInt("payment.boundary.upper")
 	if ok && int64(upper) < amount {
-		return errors.New("Transaction Boundary error")
+		return domain.TransactionBoundaryError{Amount: amount, Boundrary: int64(upper)}
 	}
 
 	lower, ok := svc.settings.GetInt("payment.boundary.lower")
 	if ok && amount < int64(lower) {
-		return errors.New("Transaction Boundary error")
+		return domain.TransactionBoundaryError{Amount: amount, Boundrary: int64(lower)}
 	}
 	return nil
 }

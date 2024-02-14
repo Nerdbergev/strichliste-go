@@ -153,6 +153,9 @@ func (r Repository) FindById(ctx context.Context, tid int64) (domain.Transaction
 		&t.Amount, &t.IsDeleted, &t.Created, &u.ID, &u.Name, &u.Email, &u.Balance,
 		&u.IsDisabled, &u.Created, &u.Updated)
 	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return domain.Transaction{}, domain.TransactionNotFoundError{ID: tid}
+		}
 		return domain.Transaction{}, err
 	}
 
@@ -234,6 +237,9 @@ func (r Repository) findByIdWithoutNestedTransactions(ctx context.Context, id in
 		&user.Email, &user.Balance, &user.IsDisabled, &user.Created, &user.Updated)
 
 	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return Transaction{}, domain.TransactionNotFoundError{ID: id}
+		}
 		return Transaction{}, err
 	}
 
