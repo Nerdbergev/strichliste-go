@@ -23,6 +23,15 @@ func (err ArticleInactiveError) Error() string {
 	return fmt.Sprintf("Article '%s' (%d) is inactive", err.Name, err.Id)
 }
 
+type ArticleBarcodeAlreadyExistsError struct {
+	Id      int64
+	Barcode string
+}
+
+func (err ArticleBarcodeAlreadyExistsError) Error() string {
+	return fmt.Sprintf("Active article (%d) with barcode '%s' already exists.", err.Id, err.Barcode)
+}
+
 type Article struct {
 	ID         int64
 	Name       string
@@ -31,6 +40,7 @@ type Article struct {
 	IsActive   bool
 	Created    time.Time
 	UsageCount int64
+	Precursor  *Article
 }
 
 func (a *Article) IncrementUsageCount() {
@@ -42,10 +52,11 @@ func (a *Article) DecrementUsageCount() {
 }
 
 type ArticleRepository interface {
-	GetAll(bool) ([]Article, error)
+	GetAll(bool, bool, string, *bool) ([]Article, error)
 	FindById(context.Context, int64) (Article, error)
-	FindByBarcode(string) (Article, error)
-	StoreArticle(Article) (Article, error)
+	FindActiveByBarcode(string) (Article, error)
+	StoreArticle(context.Context, Article) (Article, error)
 	UpdateArticle(context.Context, Article) error
 	DeleteById(int64) error
+	Transactional(context.Context, func(context.Context) error) error
 }

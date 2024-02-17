@@ -81,8 +81,10 @@ func main() {
 		})
 		r.Get("/settings", sh.GetSettings)
 		r.Route("/article", func(r chi.Router) {
-			r.Get("/", ah.GetAll)
+			r.Get("/", ah.List)
 			r.Post("/", ah.CreateArticle)
+			r.Post("/{aid}", ah.UpdateArticle)
+			r.Delete("/{aid}", ah.DeactivateArticle)
 		})
 	})
 

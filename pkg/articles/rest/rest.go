@@ -5,8 +5,10 @@ import (
 	"net/http"
 	"sort"
 	"strconv"
+	"strings"
 	"time"
 
+	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/render"
 	"github.com/nerdbergev/strichliste-go/pkg/articles"
 	"github.com/nerdbergev/strichliste-go/pkg/articles/domain"
@@ -22,21 +24,37 @@ func NewHandler(svc articles.Service) Handler {
 	}
 }
 
-func (h Handler) GetAll(w http.ResponseWriter, r *http.Request) {
-	activeParam := r.URL.Query().Get("active")
-	var (
-		articles []domain.Article
-		err      error
-	)
-	if activeParam == "" {
-		activeParam = "true"
-	}
-	isActive, perr := strconv.ParseBool(activeParam)
+func (h Handler) List(w http.ResponseWriter, r *http.Request) {
+	isActive, perr := parseActiveParam(r)
 	if perr != nil {
 		_ = render.Render(w, r, ErrRender(perr))
 		return
 	}
-	articles, err = h.svc.GetAll(isActive)
+
+	barcode := strings.TrimSpace(r.URL.Query().Get("barcode"))
+
+	precursor, perr := parsePrecursorParam(r)
+	if perr != nil {
+		_ = render.Render(w, r, ErrRender(perr))
+		return
+	}
+
+	ancestorVal, ok, perr := parseAncestorParam(r)
+	if perr != nil {
+		_ = render.Render(w, r, ErrRender(perr))
+		return
+	}
+	var ancestor *bool
+	if ok {
+		ancestor = &ancestorVal
+	}
+
+	var (
+		articles []domain.Article
+		err      error
+	)
+
+	articles, err = h.svc.GetAll(isActive, precursor, barcode, ancestor)
 	if err != nil {
 		_ = render.Render(w, r, ErrRender(err))
 		return
@@ -61,9 +79,45 @@ func (h Handler) CreateArticle(w http.ResponseWriter, r *http.Request) {
 	created, err := h.svc.CreateArticle(aReq)
 	if err != nil {
 		_ = render.Render(w, r, ErrRender(err))
+		return
 	}
 	render.JSON(w, r, NewArticleResponse(created))
 
+}
+
+func (h Handler) UpdateArticle(w http.ResponseWriter, r *http.Request) {
+	aid, err := strconv.ParseInt(chi.URLParam(r, "aid"), 10, 64)
+	if err != nil {
+		_ = render.Render(w, r, ErrRender(err))
+		return
+	}
+	aReq := &ArticleRequest{}
+	if err := render.Bind(r, aReq); err != nil {
+		_ = render.Render(w, r, ErrInvalidRequest(err))
+		return
+	}
+
+	updated, err := h.svc.UpdateArticle(aid, aReq)
+	if err != nil {
+		_ = render.Render(w, r, ErrRender(err))
+		return
+	}
+	render.JSON(w, r, NewArticleResponse(updated))
+}
+
+func (h Handler) DeactivateArticle(w http.ResponseWriter, r *http.Request) {
+	aid, err := strconv.ParseInt(chi.URLParam(r, "aid"), 10, 64)
+	if err != nil {
+		_ = render.Render(w, r, ErrRender(err))
+		return
+	}
+
+	deleted, err := h.svc.DeactivateArticle(aid)
+	if err != nil {
+		_ = render.Render(w, r, ErrRender(err))
+		return
+	}
+	render.JSON(w, r, NewArticleResponse(deleted))
 }
 
 type ArticleRequest struct {
@@ -71,7 +125,8 @@ type ArticleRequest struct {
 	BarcodeParam  *string `json:"barcode"`
 	IsActiveParam bool    `json:"isActive"`
 	AmountParam   int64   `json:"amount"`
-	// PrecursorParam *ArticleRequest `json:"precursor"` TODO
+	// Not implemented at the moment since the original strichliste doesn't too.
+	PrecursorParam *ArticleRequest `json:"precursor"`
 }
 
 func (a ArticleRequest) Bind(r *http.Request) error {
@@ -86,7 +141,7 @@ func (a ArticleRequest) Name() string {
 }
 
 func (a ArticleRequest) HasBarcode() bool {
-	return a.BarcodeParam != nil
+	return a.BarcodeParam != nil && strings.TrimSpace(*a.BarcodeParam) != ""
 }
 
 func (a ArticleRequest) Barcode() string {
@@ -99,6 +154,14 @@ func (a ArticleRequest) IsActive() bool {
 
 func (a ArticleRequest) Amount() int64 {
 	return a.AmountParam
+}
+
+func (a ArticleRequest) HasPrecursor() bool {
+	return a.PrecursorParam != nil
+}
+
+func (a ArticleRequest) Precursor() articles.ArticleRequest {
+	return *a.PrecursorParam
 }
 
 type ErrResponse struct {
@@ -175,6 +238,10 @@ func MapArticle(a domain.Article) Article {
 		resp.Barcode = new(string)
 		*resp.Barcode = *a.Barcode
 	}
+	if a.Precursor != nil {
+		resp.Precursor = new(Article)
+		*resp.Precursor = MapArticle(*a.Precursor)
+	}
 	return resp
 }
 
@@ -188,4 +255,31 @@ func (ar ArticleResponse) Render(w http.ResponseWriter, r *http.Request) error {
 
 func NewArticleResponse(a domain.Article) ArticleResponse {
 	return ArticleResponse{Article: MapArticle(a)}
+}
+
+func parseActiveParam(r *http.Request) (isActive bool, err error) {
+	activeParam := strings.TrimSpace(r.URL.Query().Get("active"))
+	if activeParam == "" {
+		return true, nil
+	}
+	return strconv.ParseBool(activeParam)
+}
+
+func parsePrecursorParam(r *http.Request) (precursor bool, err error) {
+	precursorParam := strings.TrimSpace(r.URL.Query().Get("precursor"))
+	if precursorParam == "" {
+		return true, nil
+	}
+	return strconv.ParseBool(precursorParam)
+}
+
+// parseAncestorParam parses the ancestor query param.
+// It returns ok = false if the query param was not sent.
+func parseAncestorParam(r *http.Request) (ancestor, ok bool, err error) {
+	ancestorParam := strings.TrimSpace(r.URL.Query().Get("ancestor"))
+	if ancestorParam == "" {
+		return false, false, nil
+	}
+	parsed, err := strconv.ParseBool(ancestorParam)
+	return parsed, true, err
 }

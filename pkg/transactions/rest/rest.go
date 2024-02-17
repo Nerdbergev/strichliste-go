@@ -253,7 +253,7 @@ type TransactionRequest struct {
 }
 
 func (u TransactionRequest) Bind(r *http.Request) error {
-	if len(*u.Comment) > 255 {
+	if u.Comment != nil && len(*u.Comment) > 255 {
 		return ParameterInvalidError{Name: "comment"}
 	}
 	return nil
