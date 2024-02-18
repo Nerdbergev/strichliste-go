@@ -100,6 +100,12 @@ func (r Repository) GetAll(onlyActive, precursor bool, barcode string, ancestor 
 	return result, nil
 }
 
+func (r Repository) CountActive() (int, error) {
+	var count int
+	err := r.db.QueryRow("SELECT count(*) FROM article WHERE active = true").Scan(&count)
+	return count, err
+}
+
 func (r Repository) FindById(ctx context.Context, aid int64) (domain.Article, error) {
 	row := r.getDB(ctx).QueryRow("SELECT * FROM article WHERE id = ?", aid)
 

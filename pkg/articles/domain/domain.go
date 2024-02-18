@@ -53,6 +53,7 @@ func (a *Article) DecrementUsageCount() {
 
 type ArticleRepository interface {
 	GetAll(bool, bool, string, *bool) ([]Article, error)
+	CountActive() int
 	FindById(context.Context, int64) (Article, error)
 	FindActiveByBarcode(string) (Article, error)
 	StoreArticle(context.Context, Article) (Article, error)

@@ -3,7 +3,6 @@ package rest
 import (
 	"errors"
 	"net/http"
-	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -60,11 +59,7 @@ func (h Handler) List(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	sort.Slice(articles, func(i, j int) bool {
-		return articles[i].Name < articles[j].Name
-	})
-
-	if err := render.Render(w, r, NewArticleListResponse(articles)); err != nil {
+	if err := render.Render(w, r, NewArticleListResponse(articles, h.svc.CountActive())); err != nil {
 		_ = render.Render(w, r, ErrRender(err))
 	}
 }
@@ -196,8 +191,8 @@ func ErrRender(err error) render.Renderer {
 	}
 }
 
-func NewArticleListResponse(articles []domain.Article) ArticleListResponse {
-	list := ArticleListResponse{Count: len(articles), Articles: []Article{}}
+func NewArticleListResponse(articles []domain.Article, count int) ArticleListResponse {
+	list := ArticleListResponse{Count: count, Articles: []Article{}}
 	for _, a := range articles {
 		list.Articles = append(list.Articles, MapArticle(a))
 	}

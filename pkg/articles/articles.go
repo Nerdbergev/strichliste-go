@@ -23,6 +23,10 @@ func (svc Service) GetAll(onlyActive, precursor bool, barcode string, ancestor *
 	return svc.repo.GetAll(onlyActive, precursor, barcode, ancestor)
 }
 
+func (svc Service) CountActive() int {
+	return svc.repo.CountActive()
+}
+
 type ArticleRequest interface {
 	Name() string
 	HasBarcode() bool
