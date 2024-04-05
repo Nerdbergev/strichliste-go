@@ -105,7 +105,7 @@ func (r Repository) StoreTransaction(ctx context.Context,
 	t domain.Transaction) (domain.Transaction, error) {
 	query := `INSERT INTO transactions
                 (amount, user_id, created, article_id, deleted, recipient_transaction_id, comment)
-                VALUES ($1, $2, $3, $4, false, $5, $6)`
+                VALUES (?, ?, ?, ?, false, ?, ?)`
 	var (
 		articleID              *int64
 		recipientTransactionID *int64
@@ -193,19 +193,19 @@ func (r Repository) FindById(ctx context.Context, tid int64) (domain.Transaction
 }
 
 func (r Repository) DeleteById(ctx context.Context, tid int64) error {
-	query := `DELETE FROM transactions WHERE id = $1`
+	query := `DELETE FROM transactions WHERE id = ?`
 	_, err := r.getDB(ctx).Exec(query, tid)
 	return err
 }
 
 func (r Repository) UpdateSenderTransaction(ctx context.Context, t domain.Transaction) error {
-	query := `UPDATE transactions SET sender_transaction_id = $1 WHERE id = $2`
+	query := `UPDATE transactions SET sender_transaction_id = ? WHERE id = ?`
 	_, err := r.getDB(ctx).Exec(query, t.SenderTransaction.ID, t.ID)
 	return err
 }
 
 func (r Repository) MarkDeleted(ctx context.Context, tid int64) error {
-	query := `UPDATE transactions SET deleted = true WHERE id = $1`
+	query := `UPDATE transactions SET deleted = true WHERE id = ?`
 	_, err := r.getDB(ctx).Exec(query, tid)
 	return err
 }

@@ -12,6 +12,9 @@ import (
 	"github.com/nerdbergev/strichliste-go/pkg/articles"
 	arepo "github.com/nerdbergev/strichliste-go/pkg/articles/repository"
 	arest "github.com/nerdbergev/strichliste-go/pkg/articles/rest"
+	"github.com/nerdbergev/strichliste-go/pkg/metrics"
+	mrepo "github.com/nerdbergev/strichliste-go/pkg/metrics/repository"
+	mrest "github.com/nerdbergev/strichliste-go/pkg/metrics/rest"
 	"github.com/nerdbergev/strichliste-go/pkg/settings"
 	"github.com/nerdbergev/strichliste-go/pkg/transactions"
 	trepo "github.com/nerdbergev/strichliste-go/pkg/transactions/repository"
@@ -21,13 +24,23 @@ import (
 	urest "github.com/nerdbergev/strichliste-go/pkg/users/rest"
 	"gopkg.in/yaml.v3"
 
+	"github.com/go-sql-driver/mysql"
 	_ "github.com/mattn/go-sqlite3"
 )
 
 func main() {
-	r := chi.NewRouter()
-
-	db, err := sql.Open("sqlite3", "data.db")
+	// db, err := sql.Open("sqlite3", "data.db")
+	// Capture connection properties.
+	cfg := mysql.Config{
+		User:                 "strichliste",
+		Passwd:               "mypass",
+		Net:                  "tcp",
+		Addr:                 "127.0.0.1:3306",
+		DBName:               "strichliste",
+		AllowNativePasswords: true,
+		ParseTime:            true,
+	}
+	db, err := sql.Open("mysql", cfg.FormatDSN())
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -61,6 +74,11 @@ func main() {
 	tsvc := transactions.NewService(tr, ur, ar, ss)
 	th := trest.NewHandler(tsvc)
 
+	mr := mrepo.New(db)
+	msvc := metrics.NewService(mr)
+	mh := mrest.NewHandler(msvc)
+
+	r := chi.NewRouter()
 	r.Use(middleware.RequestID)
 	r.Use(middleware.Logger)
 	r.Use(middleware.Recoverer)
@@ -85,6 +103,9 @@ func main() {
 			r.Post("/", ah.CreateArticle)
 			r.Post("/{aid}", ah.UpdateArticle)
 			r.Delete("/{aid}", ah.DeactivateArticle)
+		})
+		r.Route("/metrics", func(r chi.Router) {
+			r.Get("/", mh.GetMetrics)
 		})
 	})
 

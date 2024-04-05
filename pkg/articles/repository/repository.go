@@ -152,7 +152,7 @@ func (r Repository) StoreArticle(ctx context.Context, a domain.Article) (domain.
 		precursorID = &a.Precursor.ID
 	}
 	a.Created = time.Now()
-	res, err := r.getDB(ctx).Exec("INSERT INTO article (name, barcode, amount, active, created, usage_count, precursor_id) VALUES ($1, $2, $3, $4, $5, 0, $6)",
+	res, err := r.getDB(ctx).Exec("INSERT INTO article (name, barcode, amount, active, created, usage_count, precursor_id) VALUES (?, ?, ?, ?, ?, 0, ?)",
 		a.Name, a.Barcode, a.Amount, a.IsActive, a.Created, precursorID)
 	if err != nil {
 		return domain.Article{}, err
@@ -166,7 +166,7 @@ func (r Repository) StoreArticle(ctx context.Context, a domain.Article) (domain.
 }
 
 func (r Repository) UpdateArticle(ctx context.Context, a domain.Article) error {
-	_, err := r.getDB(ctx).Exec("UPDATE article SET name=$1, barcode=$2, amount=$3, active=$4, usage_count=$5 WHERE ID = $6",
+	_, err := r.getDB(ctx).Exec("UPDATE article SET name=?, barcode=?, amount=?, active=?, usage_count=? WHERE ID = ?",
 		a.Name, a.Barcode, a.Amount, a.IsActive, a.UsageCount, a.ID)
 	return err
 }

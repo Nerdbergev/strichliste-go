@@ -76,6 +76,7 @@ func (h Handler) GetAll(w http.ResponseWriter, r *http.Request) {
 	if activeParam == "" {
 		users, err = h.svc.GetAll()
 		if err != nil {
+			fmt.Println(err)
 			_ = render.Render(w, r, ErrServerError(err))
 			return
 		}
@@ -156,6 +157,7 @@ func (h Handler) renderError(w http.ResponseWriter, r *http.Request, err error) 
 	case errors.As(err, &piErr):
 		_ = render.Render(w, r, ErrInvalidParamter(piErr.Name))
 	default:
+		fmt.Println("test", err)
 		_ = render.Render(w, r, ErrServerError(err))
 	}
 }
