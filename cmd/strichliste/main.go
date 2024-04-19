@@ -13,6 +13,7 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/chi-middleware/proxy"
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/go-chi/render"
@@ -95,12 +96,14 @@ func run(ctx context.Context, w io.Writer, args []string, getenv func(string) st
 	msvc := metrics.NewService(mr)
 	metricsHandler := mrest.NewHandler(msvc)
 
+	trustedProxies := strings.Split(getenv("TRUSTED_PROXIES"), ",")
 	srv := NewServer(
 		settingsHandler,
 		articlesHandler,
 		usersHandler,
 		transactionsHandler,
 		metricsHandler,
+		trustedProxies,
 	)
 	httpServer := &http.Server{
 		Addr:    net.JoinHostPort("127.0.0.1", "8081"),
@@ -132,11 +135,20 @@ func NewServer(
 	uh urest.Handler,
 	th trest.Handler,
 	mh mrest.Handler,
+	trustedProxies []string,
 ) http.Handler {
 	r := chi.NewRouter()
 	r.Use(middleware.RequestID)
 	r.Use(middleware.Logger)
 	r.Use(middleware.Recoverer)
+
+	for _, addr := range trustedProxies {
+		r.Use(proxy.ForwardedHeaders(
+			proxy.NewForwardedHeadersOptions().
+				ClearTrustedProxies().
+				AddTrustedProxy(strings.TrimSpace(addr)),
+		))
+	}
 
 	addRoutes(
 		r,
