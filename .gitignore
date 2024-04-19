@@ -21,3 +21,4 @@
 go.work
 
 data.db
+.env
