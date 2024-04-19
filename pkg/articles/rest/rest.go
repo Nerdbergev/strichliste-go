@@ -59,7 +59,12 @@ func (h Handler) List(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := render.Render(w, r, NewArticleListResponse(articles, h.svc.CountActive())); err != nil {
+	count, err := h.svc.CountActive()
+	if err != nil {
+		_ = render.Render(w, r, ErrRender(err))
+		return
+	}
+	if err := render.Render(w, r, NewArticleListResponse(articles, count)); err != nil {
 		_ = render.Render(w, r, ErrRender(err))
 	}
 }

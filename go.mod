@@ -6,8 +6,10 @@ require (
 	github.com/go-chi/chi/v5 v5.0.11
 	github.com/go-chi/render v1.0.3
 	github.com/go-sql-driver/mysql v1.8.0
+	github.com/joho/godotenv v1.5.1
 	github.com/mattn/go-sqlite3 v1.14.19
 	github.com/pkg/errors v0.9.1
+	github.com/xo/dburl v0.23.0
 	gopkg.in/yaml.v3 v3.0.1
 )
 

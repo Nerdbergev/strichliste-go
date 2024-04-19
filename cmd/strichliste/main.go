@@ -1,7 +1,6 @@
 package main
 
 import (
-	"database/sql"
 	"log"
 	"net/http"
 	"os"
@@ -24,23 +23,22 @@ import (
 	urest "github.com/nerdbergev/strichliste-go/pkg/users/rest"
 	"gopkg.in/yaml.v3"
 
-	"github.com/go-sql-driver/mysql"
+	_ "github.com/go-sql-driver/mysql"
+	"github.com/joho/godotenv"
 	_ "github.com/mattn/go-sqlite3"
+	"github.com/xo/dburl"
 )
 
 func main() {
-	// db, err := sql.Open("sqlite3", "data.db")
-	// Capture connection properties.
-	cfg := mysql.Config{
-		User:                 "strichliste",
-		Passwd:               "mypass",
-		Net:                  "tcp",
-		Addr:                 "127.0.0.1:3306",
-		DBName:               "strichliste",
-		AllowNativePasswords: true,
-		ParseTime:            true,
+	env, err := godotenv.Read(".env")
+	if err != nil {
+		log.Fatal(err)
 	}
-	db, err := sql.Open("mysql", cfg.FormatDSN())
+	dbUrl, ok := env["DATABASE_URL"]
+	if !ok {
+		log.Fatal(".env is missing DATABASE_URL")
+	}
+	db, err := dburl.Open(dbUrl)
 	if err != nil {
 		log.Fatal(err)
 	}
