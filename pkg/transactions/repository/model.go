@@ -32,11 +32,17 @@ type User struct {
 	Updated    sql.NullTime
 }
 
+type Barcode struct {
+	ID      sql.NullInt64
+	Barcode sql.NullString
+	Created sql.NullTime
+}
+
 type Article struct {
 	ID          int64
 	PrecursorID sql.NullInt64
 	Name        string
-	Barcode     sql.NullString
+	Barcodes    []Barcode
 	Amount      int64
 	IsActive    bool
 	Created     time.Time
@@ -97,6 +103,18 @@ func mapUserToDomain(u User) udomain.User {
 	return du
 }
 
+func mapBarcodes(barcodes []Barcode) []adomain.Barcode {
+	mapped := make([]adomain.Barcode, 0, len(barcodes))
+	for _, b := range barcodes {
+		mapped = append(mapped, adomain.Barcode{
+			ID:      b.ID.Int64,
+			Barcode: b.Barcode.String,
+			Created: b.Created.Time,
+		})
+	}
+	return mapped
+}
+
 func mapArticleToDomain(a Article) *adomain.Article {
 	da := &adomain.Article{
 		ID:         a.ID,
@@ -105,11 +123,7 @@ func mapArticleToDomain(a Article) *adomain.Article {
 		IsActive:   a.IsActive,
 		Created:    a.Created,
 		UsageCount: a.UsageCount,
-	}
-
-	if a.Barcode.Valid {
-		da.Barcode = new(string)
-		*da.Barcode = a.Barcode.String
+		Barcodes:   mapBarcodes(a.Barcodes),
 	}
 
 	return da

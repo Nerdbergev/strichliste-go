@@ -210,12 +210,41 @@ func (r Repository) MarkDeleted(ctx context.Context, tid int64) error {
 	return err
 }
 
+func (r Repository) GetArticleReferenceCount(aid int64) (int64, error) {
+	query := `SELECT count(id) FROM transactions WHERE article_id = ?`
+	row := r.db.QueryRow(query, aid)
+
+	var count int64
+	err := row.Scan(&count)
+	return count, err
+}
+
 func (r Repository) findArticleById(ctx context.Context, aid int64) (Article, error) {
-	row := r.getDB(ctx).QueryRow("SELECT * FROM article WHERE id = ?", aid)
-	var a Article
-	err := row.Scan(&a.ID, &a.PrecursorID, &a.Name, &a.Barcode, &a.Amount, &a.IsActive, &a.Created,
-		&a.UsageCount)
-	return a, err
+	rows, err := r.getDB(ctx).Query("SELECT a.id, a.precursor_id, a.name, a.amount, a.active, a.created, a.usage_count, b.id, b.barcode, b.created FROM article a LEFT JOIN barcode b ON (b.article_id = a.id) WHERE a.id = ?", aid)
+	if err != nil {
+		return Article{}, err
+	}
+
+	var article *Article
+	for rows.Next() {
+		var (
+			a Article
+			b Barcode
+		)
+
+		err := rows.Scan(&a.ID, &a.PrecursorID, &a.Name, &a.Amount, &a.IsActive, &a.Created, &a.UsageCount, &b.ID, &b.Barcode, &b.Created)
+		if err != nil {
+			return Article{}, err
+		}
+		if article == nil {
+			article = &a
+		}
+		if b.ID.Valid {
+			article.Barcodes = append(article.Barcodes, b)
+		}
+	}
+
+	return *article, nil
 }
 
 func (r Repository) findByIdWithoutNestedTransactions(ctx context.Context, id int64) (Transaction, error) {

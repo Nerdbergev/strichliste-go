@@ -47,7 +47,7 @@ func (h Handler) FindById(w http.ResponseWriter, r *http.Request) {
 	idParam := chi.URLParam(r, "uid")
 	id, err := strconv.ParseInt(idParam, 10, 64)
 	if err != nil {
-		_ = render.Render(w, r, ErrInvalidParamter("id"))
+		_ = render.Render(w, r, ErrInvalidParamter("uid"))
 		return
 	}
 
@@ -76,7 +76,6 @@ func (h Handler) GetAll(w http.ResponseWriter, r *http.Request) {
 	if activeParam == "" {
 		users, err = h.svc.GetAll()
 		if err != nil {
-			fmt.Println(err)
 			_ = render.Render(w, r, ErrServerError(err))
 			return
 		}
@@ -157,7 +156,6 @@ func (h Handler) renderError(w http.ResponseWriter, r *http.Request, err error) 
 	case errors.As(err, &piErr):
 		_ = render.Render(w, r, ErrInvalidParamter(piErr.Name))
 	default:
-		fmt.Println("test", err)
 		_ = render.Render(w, r, ErrServerError(err))
 	}
 }

@@ -2,17 +2,22 @@ package articles
 
 import (
 	"context"
-	"errors"
 
 	"github.com/nerdbergev/strichliste-go/pkg/articles/domain"
+	bdomain "github.com/nerdbergev/strichliste-go/pkg/barcodes/domain"
+	tdomain "github.com/nerdbergev/strichliste-go/pkg/transactions/domain"
 )
 
-func NewService(repo domain.ArticleRepository) Service {
-	return Service{repo: repo}
+func NewService(repo domain.ArticleRepository,
+	trepo tdomain.TransactionRepository,
+	brepo bdomain.BarcodeRepository) Service {
+	return Service{repo: repo, trepo: trepo, brepo: brepo}
 }
 
 type Service struct {
-	repo domain.ArticleRepository
+	repo  domain.ArticleRepository
+	trepo tdomain.TransactionRepository
+	brepo bdomain.BarcodeRepository
 }
 
 type Filter interface {
@@ -27,10 +32,12 @@ func (svc Service) CountActive() (int, error) {
 	return svc.repo.CountActive()
 }
 
+func (svc Service) FindById(aid int64) (domain.Article, error) {
+	return svc.repo.FindById(context.Background(), aid)
+}
+
 type ArticleRequest interface {
 	Name() string
-	HasBarcode() bool
-	Barcode() string
 	IsActive() bool
 	Amount() int64
 	HasPrecursor() bool
@@ -43,27 +50,40 @@ func (svc Service) CreateArticle(req ArticleRequest) (domain.Article, error) {
 		IsActive: req.IsActive(),
 		Amount:   req.Amount(),
 	}
-	if req.HasBarcode() {
-		if existing, err := svc.repo.FindActiveByBarcode(req.Barcode()); err == nil {
-			return domain.Article{}, domain.ArticleBarcodeAlreadyExistsError{
-				Id:      existing.ID,
-				Barcode: *existing.Barcode,
-			}
-		}
-		a.Barcode = new(string)
-		*a.Barcode = req.Barcode()
-	}
 
 	return svc.repo.StoreArticle(context.Background(), a)
 }
 
 func (svc Service) UpdateArticle(aid int64, req ArticleRequest) (domain.Article, error) {
-	exists, err := svc.repo.FindById(context.Background(), aid)
+	existing, err := svc.repo.FindById(context.Background(), aid)
 	if err != nil {
 		return domain.Article{}, err
 	}
-	if !exists.IsActive {
-		return domain.Article{}, domain.ArticleInactiveError{Id: aid, Name: exists.Name}
+
+	if !existing.IsActive {
+		return domain.Article{}, domain.ArticleInactiveError{Id: existing.ID, Name: existing.Name}
+	}
+
+	// We could probably just use the usage count from the existing article but the original php
+	// backend implemented it like this and since one goal of the go rewrite is to be bug and
+	// feature compatible, we'll just do the same.
+	referenceCount, err := svc.trepo.GetArticleReferenceCount(aid)
+	if err != nil {
+		return domain.Article{}, err
+	}
+
+	// Article was not used before, just update the fields
+	if referenceCount == 0 {
+
+		existing.Name = req.Name()
+		existing.Amount = req.Amount()
+
+		if existing.IsActivatable() && req.IsActive() {
+			existing.IsActive = true
+		}
+
+		err = svc.repo.UpdateArticle(context.Background(), existing)
+		return existing, err
 	}
 
 	newArticle := domain.Article{
@@ -72,34 +92,24 @@ func (svc Service) UpdateArticle(aid int64, req ArticleRequest) (domain.Article,
 		Amount:   req.Amount(),
 	}
 
-	if req.HasBarcode() {
-		byBarcode, err := svc.repo.FindActiveByBarcode(req.Barcode())
-		if err == nil {
-			if byBarcode.ID != exists.ID {
-				return domain.Article{}, domain.ArticleBarcodeAlreadyExistsError{
-					Id:      byBarcode.ID,
-					Barcode: *byBarcode.Barcode,
-				}
-			}
-		} else if !errors.As(err, &domain.ArticleNotFoundError{}) {
-			return domain.Article{}, err
-		}
-		newArticle.Barcode = new(string)
-		*newArticle.Barcode = req.Barcode()
-	}
-
-	newArticle.UsageCount = exists.UsageCount
-	exists.IsActive = false
+	newArticle.UsageCount = existing.UsageCount
+	existing.IsActive = false
 
 	var updated domain.Article
 	if err := svc.repo.Transactional(context.Background(), func(ctx context.Context) error {
-		if err := svc.repo.UpdateArticle(ctx, exists); err != nil {
+
+		if err := svc.repo.UpdateArticle(ctx, existing); err != nil {
 			return err
 		}
-		newArticle.Precursor = &exists
+		newArticle.Precursor = &existing
 		updated, err = svc.repo.StoreArticle(ctx, newArticle)
 		if err != nil {
 			return err
+		}
+		for _, bc := range existing.Barcodes {
+			if err := svc.brepo.ReassignBarcode(ctx, bc.ID, updated.ID); err != nil {
+				return err
+			}
 		}
 		return nil
 	}); err != nil {

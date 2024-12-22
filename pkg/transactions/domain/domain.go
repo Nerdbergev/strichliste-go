@@ -84,4 +84,5 @@ type TransactionRepository interface {
 	DeleteById(context.Context, int64) error
 	UpdateSenderTransaction(context.Context, Transaction) error
 	MarkDeleted(context.Context, int64) error
+	GetArticleReferenceCount(int64) (int64, error)
 }

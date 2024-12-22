@@ -20,6 +20,9 @@ import (
 	"github.com/nerdbergev/strichliste-go/pkg/articles"
 	arepo "github.com/nerdbergev/strichliste-go/pkg/articles/repository"
 	arest "github.com/nerdbergev/strichliste-go/pkg/articles/rest"
+	"github.com/nerdbergev/strichliste-go/pkg/barcodes"
+	brepo "github.com/nerdbergev/strichliste-go/pkg/barcodes/repository"
+	brest "github.com/nerdbergev/strichliste-go/pkg/barcodes/rest"
 	"github.com/nerdbergev/strichliste-go/pkg/metrics"
 	mrepo "github.com/nerdbergev/strichliste-go/pkg/metrics/repository"
 	mrest "github.com/nerdbergev/strichliste-go/pkg/metrics/rest"
@@ -77,8 +80,10 @@ func run(ctx context.Context, w io.Writer, args []string, getenv func(string) st
 	ss := settings.NewService(yml)
 	settingsHandler := settings.NewHandler(ss)
 
+	br := brepo.New(db)
+	tr := trepo.New(db)
 	ar := arepo.New(db)
-	asvc := articles.NewService(ar)
+	asvc := articles.NewService(ar, tr, br)
 	articlesHandler := arest.NewHandler(asvc)
 
 	ur := urepo.New(db)
@@ -88,13 +93,15 @@ func run(ctx context.Context, w io.Writer, args []string, getenv func(string) st
 	}
 	usersHandler := urest.NewHandler(usvc)
 
-	tr := trepo.New(db)
 	tsvc := transactions.NewService(tr, ur, ar, ss)
 	transactionsHandler := trest.NewHandler(tsvc)
 
 	mr := mrepo.New(db)
 	msvc := metrics.NewService(mr)
 	metricsHandler := mrest.NewHandler(msvc)
+
+	bsvc := barcodes.NewService(br, ar)
+	barcodesHandler := brest.NewHandler(bsvc)
 
 	trustedProxies := strings.Split(getenv("TRUSTED_PROXIES"), ",")
 	srv := NewServer(
@@ -103,6 +110,7 @@ func run(ctx context.Context, w io.Writer, args []string, getenv func(string) st
 		usersHandler,
 		transactionsHandler,
 		metricsHandler,
+		barcodesHandler,
 		trustedProxies,
 	)
 	httpServer := &http.Server{
@@ -135,6 +143,7 @@ func NewServer(
 	uh urest.Handler,
 	th trest.Handler,
 	mh mrest.Handler,
+	bh brest.Handler,
 	trustedProxies []string,
 ) http.Handler {
 	r := chi.NewRouter()
@@ -157,6 +166,7 @@ func NewServer(
 		uh,
 		th,
 		mh,
+		bh,
 	)
 
 	return r
@@ -169,14 +179,22 @@ func addRoutes(
 	uh urest.Handler,
 	th trest.Handler,
 	mh mrest.Handler,
+	bh brest.Handler,
 ) {
 	router.Use(render.SetContentType(render.ContentTypeJSON))
 	router.Route("/api", func(router chi.Router) {
+
 		router.Route("/user", func(router chi.Router) {
+			router.Options("/*", func(w http.ResponseWriter, r *http.Request) {
+				w.WriteHeader(http.StatusOK)
+			})
 			router.Get("/", uh.GetAll)
 			router.Get("/{uid}", uh.FindById)
 			router.Post("/{uid}", uh.UpdateUser)
 			router.Route("/{uid}/transaction", func(router chi.Router) {
+				router.Options("/*", func(w http.ResponseWriter, r *http.Request) {
+					w.WriteHeader(http.StatusOK)
+				})
 				router.Get("/", th.GetUserTransactions)
 				router.Post("/", th.CreateTransaction)
 				router.Delete("/{tid}", th.DeleteTransaction)
@@ -185,13 +203,17 @@ func addRoutes(
 		})
 		router.Get("/settings", sh.GetSettings)
 		router.Route("/article", func(router chi.Router) {
+			router.Options("/*", func(w http.ResponseWriter, r *http.Request) {
+				w.WriteHeader(http.StatusOK)
+			})
 			router.Get("/", ah.List)
+			router.Get("/{aid}", ah.FindById)
 			router.Post("/", ah.CreateArticle)
 			router.Post("/{aid}", ah.UpdateArticle)
+			router.Post("/{aid}/barcode", bh.AddArticleBarcode)
 			router.Delete("/{aid}", ah.DeactivateArticle)
+			router.Delete("/{aid}/barcode/{bid}", bh.DeleteArticleBarcode)
 		})
-		router.Route("/metrics", func(r chi.Router) {
-			router.Get("/", mh.GetMetrics)
-		})
+		router.Get("/metrics", mh.GetMetrics)
 	})
 }

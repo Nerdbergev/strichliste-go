@@ -11,11 +11,17 @@ import (
 	"github.com/nerdbergev/strichliste-go/pkg/database"
 )
 
+type Barcode struct {
+	ID      sql.NullInt64
+	Barcode sql.NullString
+	Created sql.NullTime
+}
+
 type Article struct {
 	ID          int64
 	PrecursorID sql.NullInt64
 	Name        string
-	Barcode     sql.NullString
+	Barcodes    []Barcode
 	Amount      int64
 	IsActive    bool
 	Created     time.Time
@@ -31,7 +37,7 @@ type Repository struct {
 }
 
 func (r Repository) GetAll(onlyActive, precursor bool, barcode string, ancestor *bool) ([]domain.Article, error) {
-	query := "SELECT a1.id, a1.precursor_id, a1.name, a1.barcode, a1.amount, a1.active, a1.created, a1.usage_count FROM article AS a1"
+	query := "SELECT a1.id, a1.precursor_id, a1.name, a1.amount, a1.active, a1.created, a1.usage_count, b.id, b.barcode, b.created FROM article AS a1 LEFT JOIN barcode b ON (b.article_id = a1.id)"
 	whereClauseStarted := false
 	if ancestor != nil {
 		query += " LEFT JOIN article a2 ON (a2.precursor_id = a1.id)"
@@ -60,7 +66,7 @@ func (r Repository) GetAll(onlyActive, precursor bool, barcode string, ancestor 
 		} else {
 			query += " WHERE"
 		}
-		query += " a1.barcode = ?"
+		query += " b.barcode = ?"
 		params = append(params, barcode)
 		whereClauseStarted = true
 	}
@@ -107,15 +113,19 @@ func (r Repository) CountActive() (int, error) {
 }
 
 func (r Repository) FindById(ctx context.Context, aid int64) (domain.Article, error) {
-	row := r.getDB(ctx).QueryRow("SELECT * FROM article WHERE id = ?", aid)
+	row, err := r.getDB(ctx).Query("SELECT a.id, a.precursor_id, a.name, a.amount, a.active, a.created, a.usage_count, b.id, b.barcode, b.created FROM article a LEFT JOIN barcode b ON (b.article_id = a.id) WHERE a.id = ?", aid)
+	if err != nil {
+		return domain.Article{}, err
+	}
 
-	article, err := processRow(row)
+	articles, err := processRows(row)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return domain.Article{}, domain.ArticleNotFoundError{Identifier: strconv.FormatInt(aid, 10)}
 		}
 		return domain.Article{}, err
 	}
+	article := articles[0]
 	var precursor *Article
 	if article.PrecursorID.Valid {
 		found, err := r.findPrecursorById(article.PrecursorID.Int64)
@@ -128,13 +138,17 @@ func (r Repository) FindById(ctx context.Context, aid int64) (domain.Article, er
 }
 
 func (r Repository) FindActiveByBarcode(barcode string) (domain.Article, error) {
-	row := r.db.QueryRow("SELECT * FROM article WHERE active = true and barcode = ?", barcode)
-	article, err := processRow(row)
+	row, err := r.db.Query("SELECT * FROM article WHERE active = true and barcode = ?", barcode)
+	if err != nil {
+		return domain.Article{}, err
+	}
+	articles, err := processRows(row)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return domain.Article{}, domain.ArticleNotFoundError{Identifier: barcode}
 		}
 	}
+	article := articles[0]
 	var precursor *Article
 	if article.PrecursorID.Valid {
 		found, err := r.findPrecursorById(article.PrecursorID.Int64)
@@ -152,8 +166,8 @@ func (r Repository) StoreArticle(ctx context.Context, a domain.Article) (domain.
 		precursorID = &a.Precursor.ID
 	}
 	a.Created = time.Now()
-	res, err := r.getDB(ctx).Exec("INSERT INTO article (name, barcode, amount, active, created, usage_count, precursor_id) VALUES (?, ?, ?, ?, ?, 0, ?)",
-		a.Name, a.Barcode, a.Amount, a.IsActive, a.Created, precursorID)
+	res, err := r.getDB(ctx).Exec("INSERT INTO article (name, amount, active, created, usage_count, precursor_id) VALUES (?, ?, ?, ?, 0, ?)",
+		a.Name, a.Amount, a.IsActive, a.Created, precursorID)
 	if err != nil {
 		return domain.Article{}, err
 	}
@@ -166,8 +180,8 @@ func (r Repository) StoreArticle(ctx context.Context, a domain.Article) (domain.
 }
 
 func (r Repository) UpdateArticle(ctx context.Context, a domain.Article) error {
-	_, err := r.getDB(ctx).Exec("UPDATE article SET name=?, barcode=?, amount=?, active=?, usage_count=? WHERE ID = ?",
-		a.Name, a.Barcode, a.Amount, a.IsActive, a.UsageCount, a.ID)
+	_, err := r.getDB(ctx).Exec("UPDATE article SET name=?, amount=?, active=?, usage_count=? WHERE ID = ?",
+		a.Name, a.Amount, a.IsActive, a.UsageCount, a.ID)
 	return err
 }
 
@@ -191,7 +205,7 @@ func (r Repository) Transactional(ctx context.Context, f func(context.Context) e
 }
 
 func (r Repository) findPrecursorById(aid int64) (Article, error) {
-	row := r.db.QueryRow("SELECT * FROM article WHERE id = ?", aid)
+	row := r.db.QueryRow("SELECT a.id, a.precursor_id, a.name, a.amount, a.active, a.created, a.usage_count FROM article a WHERE a.id = ?", aid)
 	found, err := processRow(row)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
@@ -210,8 +224,10 @@ func (r Repository) getDB(ctx context.Context) database.DB {
 }
 
 func processRow(r *sql.Row) (Article, error) {
-	var a Article
-	err := r.Scan(&a.ID, &a.PrecursorID, &a.Name, &a.Barcode, &a.Amount, &a.IsActive, &a.Created, &a.UsageCount)
+	var (
+		a Article
+	)
+	err := r.Scan(&a.ID, &a.PrecursorID, &a.Name, &a.Amount, &a.IsActive, &a.Created, &a.UsageCount)
 	if err != nil {
 		return Article{}, err
 	}
@@ -228,28 +244,48 @@ func mapToDomain(a Article, precursor *Article) domain.Article {
 		UsageCount: a.UsageCount,
 	}
 
+	for _, b := range a.Barcodes {
+		da.Barcodes = append(da.Barcodes, domain.Barcode{
+			ID:      b.ID.Int64,
+			Barcode: b.Barcode.String,
+			Created: b.Created.Time,
+		})
+	}
+
 	if precursor != nil {
 		da.Precursor = new(domain.Article)
 		*da.Precursor = mapToDomain(*precursor, nil)
-	}
-
-	if a.Barcode.Valid {
-		da.Barcode = new(string)
-		*da.Barcode = a.Barcode.String
 	}
 
 	return da
 }
 
 func processRows(r *sql.Rows) ([]Article, error) {
-	var articles []Article
+	articles := make(map[int64]*Article)
 	for r.Next() {
-		var a Article
-		err := r.Scan(&a.ID, &a.PrecursorID, &a.Name, &a.Barcode, &a.Amount, &a.IsActive, &a.Created, &a.UsageCount)
+		var (
+			a Article
+			b Barcode
+		)
+
+		err := r.Scan(&a.ID, &a.PrecursorID, &a.Name, &a.Amount, &a.IsActive, &a.Created, &a.UsageCount, &b.ID, &b.Barcode, &b.Created)
 		if err != nil {
 			return nil, err
 		}
-		articles = append(articles, a)
+		article, ok := articles[a.ID]
+		if !ok {
+			article = &a
+			articles[a.ID] = article
+		}
+
+		if b.ID.Valid {
+			article.Barcodes = append(article.Barcodes, b)
+		}
 	}
-	return articles, nil
+
+	result := make([]Article, 0, len(articles))
+	for _, article := range articles {
+		result = append(result, *article)
+	}
+	return result, nil
 }

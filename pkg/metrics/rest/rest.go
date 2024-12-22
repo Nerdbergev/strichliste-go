@@ -112,10 +112,16 @@ func (mr MetricsResponse) Render(w http.ResponseWriter, r *http.Request) error {
 	return nil
 }
 
+type Barcode struct {
+	ID      int64     `json:"id"`
+	Barcode string    `json:"barcode"`
+	Created time.Time `json:"created"`
+}
+
 type Article struct {
 	ID         int64     `json:"id"`
 	Name       string    `json:"name"`
-	Barcode    *string   `json:"barcode"`
+	Barcodes   []Barcode `json:"barcodes"`
 	Amount     int64     `json:"amount"`
 	IsActive   bool      `json:"isActive"`
 	UsageCount int64     `json:"usageCount"`
@@ -166,10 +172,14 @@ func MapArticle(article adomain.Article) Article {
 		Created:    article.Created,
 	}
 
-	if article.Barcode != nil {
-		resp.Barcode = new(string)
-		*resp.Barcode = *article.Barcode
+	for _, bc := range article.Barcodes {
+		resp.Barcodes = append(resp.Barcodes, Barcode{
+			ID:      bc.ID,
+			Barcode: bc.Barcode,
+			Created: bc.Created,
+		})
 	}
+
 	if article.Precursor != nil {
 		resp.Precursor = new(Article)
 		*resp.Precursor = MapArticle(*article.Precursor)

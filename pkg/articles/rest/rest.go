@@ -24,6 +24,7 @@ func NewHandler(svc articles.Service) Handler {
 }
 
 func (h Handler) List(w http.ResponseWriter, r *http.Request) {
+	// TODO: pagination
 	isActive, perr := parseActiveParam(r)
 	if perr != nil {
 		_ = render.Render(w, r, ErrRender(perr))
@@ -67,6 +68,20 @@ func (h Handler) List(w http.ResponseWriter, r *http.Request) {
 	if err := render.Render(w, r, NewArticleListResponse(articles, count)); err != nil {
 		_ = render.Render(w, r, ErrRender(err))
 	}
+}
+
+func (h Handler) FindById(w http.ResponseWriter, r *http.Request) {
+	aid, err := strconv.ParseInt(chi.URLParam(r, "aid"), 10, 64)
+	if err != nil {
+		_ = render.Render(w, r, ErrRender(err))
+		return
+	}
+	user, err := h.svc.FindById(aid)
+	if err != nil {
+		_ = render.Render(w, r, ErrRender(err))
+		return
+	}
+	_ = render.Render(w, r, NewArticleResponse(user))
 }
 
 func (h Handler) CreateArticle(w http.ResponseWriter, r *http.Request) {
@@ -121,23 +136,30 @@ func (h Handler) DeactivateArticle(w http.ResponseWriter, r *http.Request) {
 }
 
 type ArticleRequest struct {
-	NameParam     string  `json:"name"`
+	NameParam     *string `json:"name"`
 	BarcodeParam  *string `json:"barcode"`
 	IsActiveParam bool    `json:"isActive"`
-	AmountParam   int64   `json:"amount"`
+	AmountParam   *int64  `json:"amount"`
 	// Not implemented at the moment since the original strichliste doesn't too.
 	PrecursorParam *ArticleRequest `json:"precursor"`
 }
 
-func (a ArticleRequest) Bind(r *http.Request) error {
-	if a.NameParam == "" {
+func (a *ArticleRequest) Bind(r *http.Request) error {
+	// TODO: return proper errors
+	if a.NameParam == nil || *a.NameParam == "" {
+		return errors.New("missing required Article fields.")
+	}
+
+	*a.NameParam = strings.TrimSpace(*a.NameParam)
+
+	if a.AmountParam == nil {
 		return errors.New("missing required Article fields.")
 	}
 	return nil
 }
 
 func (a ArticleRequest) Name() string {
-	return a.NameParam
+	return *a.NameParam
 }
 
 func (a ArticleRequest) HasBarcode() bool {
@@ -153,7 +175,7 @@ func (a ArticleRequest) IsActive() bool {
 }
 
 func (a ArticleRequest) Amount() int64 {
-	return a.AmountParam
+	return *a.AmountParam
 }
 
 func (a ArticleRequest) HasPrecursor() bool {
@@ -199,7 +221,7 @@ func ErrRender(err error) render.Renderer {
 func NewArticleListResponse(articles []domain.Article, count int) ArticleListResponse {
 	list := ArticleListResponse{Count: count, Articles: []Article{}}
 	for _, a := range articles {
-		list.Articles = append(list.Articles, MapArticle(a))
+		list.Articles = append(list.Articles, mapArticle(a))
 	}
 	return list
 }
@@ -213,10 +235,16 @@ func (ar ArticleListResponse) Render(w http.ResponseWriter, r *http.Request) err
 	return nil
 }
 
+type Barcode struct {
+	ID      int64     `json:"id"`
+	Barcode string    `json:"barcode"`
+	Created time.Time `json:"created"`
+}
+
 type Article struct {
 	ID         int64     `json:"id"`
 	Name       string    `json:"name"`
-	Barcode    *string   `json:"barcode"`
+	Barcodes   []Barcode `json:"barcodes"`
 	Amount     int64     `json:"amount"`
 	IsActive   bool      `json:"isActive"`
 	UsageCount int64     `json:"usageCount"`
@@ -224,7 +252,19 @@ type Article struct {
 	Created    time.Time `json:"created"`
 }
 
-func MapArticle(a domain.Article) Article {
+func mapBarcodes(barcodes []domain.Barcode) []Barcode {
+	mapped := make([]Barcode, 0, len(barcodes))
+	for _, b := range barcodes {
+		mapped = append(mapped, Barcode{
+			ID:      b.ID,
+			Barcode: b.Barcode,
+			Created: b.Created,
+		})
+	}
+	return mapped
+}
+
+func mapArticle(a domain.Article) Article {
 	resp := Article{
 		ID:         a.ID,
 		Name:       a.Name,
@@ -232,15 +272,12 @@ func MapArticle(a domain.Article) Article {
 		IsActive:   a.IsActive,
 		UsageCount: a.UsageCount,
 		Created:    a.Created,
+		Barcodes:   mapBarcodes(a.Barcodes),
 	}
 
-	if a.Barcode != nil {
-		resp.Barcode = new(string)
-		*resp.Barcode = *a.Barcode
-	}
 	if a.Precursor != nil {
 		resp.Precursor = new(Article)
-		*resp.Precursor = MapArticle(*a.Precursor)
+		*resp.Precursor = mapArticle(*a.Precursor)
 	}
 	return resp
 }
@@ -254,7 +291,7 @@ func (ar ArticleResponse) Render(w http.ResponseWriter, r *http.Request) error {
 }
 
 func NewArticleResponse(a domain.Article) ArticleResponse {
-	return ArticleResponse{Article: MapArticle(a)}
+	return ArticleResponse{Article: mapArticle(a)}
 }
 
 func parseActiveParam(r *http.Request) (isActive bool, err error) {

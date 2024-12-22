@@ -8,6 +8,7 @@ import (
 type ctxKey struct{}
 
 type DB interface {
+	Query(string, ...any) (*sql.Rows, error)
 	QueryRow(string, ...any) *sql.Row
 	Exec(string, ...any) (sql.Result, error)
 }

@@ -121,7 +121,6 @@ func (tr TransactionListResponse) Render(w http.ResponseWriter, r *http.Request)
 }
 
 func MapTransaction(t domain.Transaction) Transaction {
-
 	resp := Transaction{
 		ID:           t.ID,
 		User:         MapUser(t.User),
@@ -193,10 +192,16 @@ type User struct {
 	Updated    *time.Time `json:"updated"`
 }
 
+type Barcode struct {
+	ID      int64     `json:"id"`
+	Barcode string    `json:"barcode"`
+	Created time.Time `json:"created"`
+}
+
 type Article struct {
 	ID         int64     `json:"id"`
 	Name       string    `json:"name"`
-	Barcode    *string   `json:"barcode"`
+	Barcodes   []Barcode `json:"barcodes"`
 	Amount     int64     `json:"amount"`
 	IsActive   bool      `json:"isActive"`
 	UsageCount int64     `json:"usageCount"`
@@ -205,20 +210,27 @@ type Article struct {
 }
 
 func mapArticle(a adomain.Article) Article {
-	resp := Article{
+	return Article{
 		ID:         a.ID,
 		Name:       a.Name,
 		Amount:     a.Amount,
 		IsActive:   a.IsActive,
 		UsageCount: a.UsageCount,
 		Created:    a.Created,
+		Barcodes:   mapBarcodes(a.Barcodes),
 	}
+}
 
-	if a.Barcode != nil {
-		resp.Barcode = new(string)
-		*resp.Barcode = *a.Barcode
+func mapBarcodes(barcodes []adomain.Barcode) []Barcode {
+	mapped := make([]Barcode, 0, len(barcodes))
+	for _, bc := range barcodes {
+		mapped = append(mapped, Barcode{
+			ID:      bc.ID,
+			Barcode: bc.Barcode,
+			Created: bc.Created,
+		})
 	}
-	return resp
+	return mapped
 }
 
 type ErrResponse struct {

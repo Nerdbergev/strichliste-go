@@ -38,22 +38,25 @@ func (repo Repository) GetUserCount() (int, error) {
 }
 
 func (repo Repository) GetArticles() ([]adomain.Article, error) {
-	rows, err := repo.db.Query("SELECT * from article WHERE active = true order by usage_count desc")
+	rows, err := repo.db.Query(`SELECT a1.id, a1.precursor_id, a1.name, a1.amount, a1.active,
+        a1.created, a1.usage_count, b.id, b.barcode, b.created
+        FROM article a1
+        LEFT JOIN barcode b ON (b.article_id = a1.id)
+        WHERE active = true order by usage_count desc`)
 	if err != nil {
 		return nil, err
 	}
-	var articles []adomain.Article
-	for rows.Next() {
-		var a Article
-		err := rows.Scan(&a.ID, &a.PrecursorID, &a.Name, &a.Barcode, &a.Amount, &a.IsActive, &a.Created,
-			&a.UsageCount)
-		if err != nil {
-			return nil, err
-		}
-		articles = append(articles, *mapArticleToDomain(a))
+
+	articles, err := processRows(rows)
+	if err != nil {
+		return nil, err
 	}
 
-	return articles, nil
+	mapped := make([]adomain.Article, 0, len(articles))
+	for _, a := range articles {
+		mapped = append(mapped, mapArticleToDomain(a))
+	}
+	return mapped, nil
 }
 
 func (repo Repository) GetTransactionsPerDay(start time.Time) ([]domain.Day, error) {
@@ -79,7 +82,8 @@ func (repo Repository) GetTransactionsPerDay(start time.Time) ([]domain.Day, err
 			chargedAmount int
 			spentAmount   int
 		)
-		err := rows.Scan(&day.Date, &day.TransactionCount, &chargedCount, &spentCount, &day.DistinctUserCount, &day.Balance, &chargedAmount, &spentAmount)
+		err := rows.Scan(&day.Date, &day.TransactionCount, &chargedCount, &spentCount,
+			&day.DistinctUserCount, &day.Balance, &chargedAmount, &spentAmount)
 		if err != nil {
 			return nil, err
 		}
@@ -102,19 +106,56 @@ func (repo Repository) GetTransactionsPerDay(start time.Time) ([]domain.Day, err
 	return days, nil
 }
 
+func processRows(r *sql.Rows) ([]Article, error) {
+	articles := make(map[int64]*Article)
+	for r.Next() {
+		var (
+			a Article
+			b Barcode
+		)
+
+		err := r.Scan(&a.ID, &a.PrecursorID, &a.Name, &a.Amount, &a.IsActive, &a.Created,
+			&a.UsageCount, &b.ID, &b.Barcode, &b.Created)
+		if err != nil {
+			return nil, err
+		}
+		article, ok := articles[a.ID]
+		if !ok {
+			article = &a
+			articles[a.ID] = article
+		}
+
+		if b.ID.Valid {
+			article.Barcodes = append(article.Barcodes, b)
+		}
+	}
+
+	result := make([]Article, 0, len(articles))
+	for _, article := range articles {
+		result = append(result, *article)
+	}
+	return result, nil
+}
+
+type Barcode struct {
+	ID      sql.NullInt64
+	Barcode sql.NullString
+	Created sql.NullTime
+}
+
 type Article struct {
 	ID          int64
 	PrecursorID sql.NullInt64
 	Name        string
-	Barcode     sql.NullString
+	Barcodes    []Barcode
 	Amount      int64
 	IsActive    bool
 	Created     time.Time
 	UsageCount  int64
 }
 
-func mapArticleToDomain(a Article) *adomain.Article {
-	da := &adomain.Article{
+func mapArticleToDomain(a Article) adomain.Article {
+	da := adomain.Article{
 		ID:         a.ID,
 		Name:       a.Name,
 		Amount:     a.Amount,
@@ -122,11 +163,12 @@ func mapArticleToDomain(a Article) *adomain.Article {
 		Created:    a.Created,
 		UsageCount: a.UsageCount,
 	}
-
-	if a.Barcode.Valid {
-		da.Barcode = new(string)
-		*da.Barcode = a.Barcode.String
+	for _, b := range a.Barcodes {
+		da.Barcodes = append(da.Barcodes, adomain.Barcode{
+			ID:      b.ID.Int64,
+			Barcode: b.Barcode.String,
+			Created: b.Created.Time,
+		})
 	}
-
 	return da
 }

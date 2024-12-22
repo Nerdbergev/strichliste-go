@@ -32,10 +32,16 @@ func (err ArticleBarcodeAlreadyExistsError) Error() string {
 	return fmt.Sprintf("Active article (%d) with barcode '%s' already exists.", err.Id, err.Barcode)
 }
 
+type Barcode struct {
+	ID      int64
+	Barcode string
+	Created time.Time
+}
+
 type Article struct {
 	ID         int64
 	Name       string
-	Barcode    *string
+	Barcodes   []Barcode
 	Amount     int64
 	IsActive   bool
 	Created    time.Time
@@ -49,6 +55,18 @@ func (a *Article) IncrementUsageCount() {
 
 func (a *Article) DecrementUsageCount() {
 	a.UsageCount -= 1
+}
+
+func (a Article) IsActivatable() bool {
+	if a.IsActive {
+		return false
+	}
+
+	if a.Precursor != nil {
+		return false
+	}
+
+	return true
 }
 
 type ArticleRepository interface {
