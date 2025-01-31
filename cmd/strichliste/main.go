@@ -27,6 +27,9 @@ import (
 	mrepo "github.com/nerdbergev/strichliste-go/pkg/metrics/repository"
 	mrest "github.com/nerdbergev/strichliste-go/pkg/metrics/rest"
 	"github.com/nerdbergev/strichliste-go/pkg/settings"
+	"github.com/nerdbergev/strichliste-go/pkg/tags"
+	tgrepo "github.com/nerdbergev/strichliste-go/pkg/tags/repository"
+	tgrest "github.com/nerdbergev/strichliste-go/pkg/tags/rest"
 	"github.com/nerdbergev/strichliste-go/pkg/transactions"
 	trepo "github.com/nerdbergev/strichliste-go/pkg/transactions/repository"
 	trest "github.com/nerdbergev/strichliste-go/pkg/transactions/rest"
@@ -103,6 +106,10 @@ func run(ctx context.Context, w io.Writer, args []string, getenv func(string) st
 	bsvc := barcodes.NewService(br, ar)
 	barcodesHandler := brest.NewHandler(bsvc)
 
+	tgr := tgrepo.New(db)
+	tgsvc := tags.NewService(tgr, ar)
+	tagsHandler := tgrest.NewHandler(tgsvc)
+
 	trustedProxies := strings.Split(getenv("TRUSTED_PROXIES"), ",")
 	srv := NewServer(
 		settingsHandler,
@@ -111,6 +118,7 @@ func run(ctx context.Context, w io.Writer, args []string, getenv func(string) st
 		transactionsHandler,
 		metricsHandler,
 		barcodesHandler,
+		tagsHandler,
 		trustedProxies,
 	)
 	httpServer := &http.Server{
@@ -144,6 +152,7 @@ func NewServer(
 	th trest.Handler,
 	mh mrest.Handler,
 	bh brest.Handler,
+	tgh tgrest.Handler,
 	trustedProxies []string,
 ) http.Handler {
 	r := chi.NewRouter()
@@ -167,6 +176,7 @@ func NewServer(
 		th,
 		mh,
 		bh,
+		tgh,
 	)
 
 	return r
@@ -180,21 +190,27 @@ func addRoutes(
 	th trest.Handler,
 	mh mrest.Handler,
 	bh brest.Handler,
+	tgh tgrest.Handler,
 ) {
 	router.Use(render.SetContentType(render.ContentTypeJSON))
-	router.Route("/api", func(router chi.Router) {
-
-		router.Route("/user", func(router chi.Router) {
-			router.Options("/*", func(w http.ResponseWriter, r *http.Request) {
+	router.Use(func(h http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			w.Header().Add("Access-Control-Allow-Origin", "*")
+			w.Header().Add("Access-Control-Allow-Methods", "GET, POST")
+			w.Header().Add("Access-Control-Allow-Headers", "Content-Type")
+			if r.Method == http.MethodOptions {
 				w.WriteHeader(http.StatusOK)
-			})
+				return
+			}
+			h.ServeHTTP(w, r)
+		})
+	})
+	router.Route("/api", func(router chi.Router) {
+		router.Route("/user", func(router chi.Router) {
 			router.Get("/", uh.GetAll)
 			router.Get("/{uid}", uh.FindById)
 			router.Post("/{uid}", uh.UpdateUser)
 			router.Route("/{uid}/transaction", func(router chi.Router) {
-				router.Options("/*", func(w http.ResponseWriter, r *http.Request) {
-					w.WriteHeader(http.StatusOK)
-				})
 				router.Get("/", th.GetUserTransactions)
 				router.Post("/", th.CreateTransaction)
 				router.Delete("/{tid}", th.DeleteTransaction)
@@ -203,11 +219,11 @@ func addRoutes(
 		})
 		router.Get("/settings", sh.GetSettings)
 		router.Route("/article", func(router chi.Router) {
-			router.Options("/*", func(w http.ResponseWriter, r *http.Request) {
-				w.WriteHeader(http.StatusOK)
-			})
 			router.Get("/", ah.List)
 			router.Get("/{aid}", ah.FindById)
+			router.Get("/{articleId}/tag", tgh.ListArticleTags)
+			router.Get("/{articleId}/tag/{tagId}", tgh.GetArticleTag)
+			router.Post("/{articleId}/tag", tgh.AddArticleTag)
 			router.Post("/", ah.CreateArticle)
 			router.Post("/{aid}", ah.UpdateArticle)
 			router.Post("/{aid}/barcode", bh.AddArticleBarcode)
@@ -215,5 +231,6 @@ func addRoutes(
 			router.Delete("/{aid}/barcode/{bid}", bh.DeleteArticleBarcode)
 		})
 		router.Get("/metrics", mh.GetMetrics)
+		router.Get("/tag", tgh.ListTags)
 	})
 }

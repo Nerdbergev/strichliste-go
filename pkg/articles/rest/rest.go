@@ -241,10 +241,14 @@ type Barcode struct {
 	Created time.Time `json:"created"`
 }
 
+type Tag struct {
+}
+
 type Article struct {
 	ID         int64     `json:"id"`
 	Name       string    `json:"name"`
 	Barcodes   []Barcode `json:"barcodes"`
+	Tags       []Tag     `json:"tags"`
 	Amount     int64     `json:"amount"`
 	IsActive   bool      `json:"isActive"`
 	UsageCount int64     `json:"usageCount"`
@@ -273,6 +277,7 @@ func mapArticle(a domain.Article) Article {
 		UsageCount: a.UsageCount,
 		Created:    a.Created,
 		Barcodes:   mapBarcodes(a.Barcodes),
+		Tags:       []Tag{},
 	}
 
 	if a.Precursor != nil {
