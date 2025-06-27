@@ -76,7 +76,7 @@ func (h Handler) FindById(w http.ResponseWriter, r *http.Request) {
 		_ = render.Render(w, r, ErrRender(err))
 		return
 	}
-	user, err := h.svc.FindById(aid)
+	user, err := h.svc.FindById(domain.ArticleID(aid))
 	if err != nil {
 		_ = render.Render(w, r, ErrRender(err))
 		return
@@ -112,7 +112,7 @@ func (h Handler) UpdateArticle(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	updated, err := h.svc.UpdateArticle(aid, aReq)
+	updated, err := h.svc.UpdateArticle(domain.ArticleID(aid), aReq)
 	if err != nil {
 		_ = render.Render(w, r, ErrRender(err))
 		return
@@ -127,7 +127,7 @@ func (h Handler) DeactivateArticle(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	deleted, err := h.svc.DeactivateArticle(aid)
+	deleted, err := h.svc.DeactivateArticle(domain.ArticleID(aid))
 	if err != nil {
 		_ = render.Render(w, r, ErrRender(err))
 		return
@@ -235,14 +235,14 @@ func (ar ArticleListResponse) Render(w http.ResponseWriter, r *http.Request) err
 	return nil
 }
 
-type Barcode struct {
-	ID      int64     `json:"id"`
-	Barcode string    `json:"barcode"`
-	Created time.Time `json:"created"`
-}
-
-type Tag struct {
-}
+// type Barcode struct {
+// 	ID      int64     `json:"id"`
+// 	Barcode string    `json:"barcode"`
+// 	Created time.Time `json:"created"`
+// }
+//
+// type Tag struct {
+// }
 
 type Article struct {
 	ID         int64     `json:"id"`
@@ -256,28 +256,28 @@ type Article struct {
 	Created    time.Time `json:"created"`
 }
 
-func mapBarcodes(barcodes []domain.Barcode) []Barcode {
-	mapped := make([]Barcode, 0, len(barcodes))
-	for _, b := range barcodes {
-		mapped = append(mapped, Barcode{
-			ID:      b.ID,
-			Barcode: b.Barcode,
-			Created: b.Created,
-		})
-	}
-	return mapped
-}
+// func mapBarcodes(barcodes []domain.Barcode) []Barcode {
+// 	mapped := make([]Barcode, 0, len(barcodes))
+// 	for _, b := range barcodes {
+// 		mapped = append(mapped, Barcode{
+// 			ID:      b.ID,
+// 			Barcode: b.Barcode,
+// 			Created: b.Created,
+// 		})
+// 	}
+// 	return mapped
+// }
 
 func mapArticle(a domain.Article) Article {
 	resp := Article{
-		ID:         a.ID,
+		ID:         int64(a.ID),
 		Name:       a.Name,
 		Amount:     a.Amount,
 		IsActive:   a.IsActive,
 		UsageCount: a.UsageCount,
 		Created:    a.Created,
 		Barcodes:   mapBarcodes(a.Barcodes),
-		Tags:       []Tag{},
+		Tags:       mapTags(a.Tags),
 	}
 
 	if a.Precursor != nil {
@@ -285,6 +285,20 @@ func mapArticle(a domain.Article) Article {
 		*resp.Precursor = mapArticle(*a.Precursor)
 	}
 	return resp
+}
+
+func mapTags(ts []domain.Tag) []Tag {
+	mapped := make([]Tag, 0, len(ts))
+	for _, t := range ts {
+		mapped = append(mapped, Tag{
+			ID:         int64(t.ID),
+			Tag:        t.Tag,
+			Created:    t.Created,
+			UsageCount: t.UsageCount,
+		})
+	}
+
+	return mapped
 }
 
 type ArticleResponse struct {

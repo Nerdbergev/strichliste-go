@@ -211,7 +211,7 @@ type Article struct {
 
 func mapArticle(a adomain.Article) Article {
 	return Article{
-		ID:         a.ID,
+		ID:         int64(a.ID),
 		Name:       a.Name,
 		Amount:     a.Amount,
 		IsActive:   a.IsActive,
@@ -225,7 +225,7 @@ func mapBarcodes(barcodes []adomain.Barcode) []Barcode {
 	mapped := make([]Barcode, 0, len(barcodes))
 	for _, bc := range barcodes {
 		mapped = append(mapped, Barcode{
-			ID:      bc.ID,
+			ID:      int64(bc.ID),
 			Barcode: bc.Barcode,
 			Created: bc.Created,
 		})

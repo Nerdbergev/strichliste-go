@@ -111,7 +111,8 @@ func (r Repository) StoreTransaction(ctx context.Context,
 		recipientTransactionID *int64
 	)
 	if t.Article != nil {
-		articleID = &t.Article.ID
+		articleID = new(int64)
+		*articleID = int64(t.Article.ID)
 	}
 	if t.RecipientTransaction != nil {
 		recipientTransactionID = &t.RecipientTransaction.ID

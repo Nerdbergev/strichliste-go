@@ -2,8 +2,15 @@ package domain
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"time"
+)
+
+type (
+	ArticleID int64
+	BarcodeID int64
+	TagID     int64
 )
 
 type ArticleNotFoundError struct {
@@ -16,7 +23,7 @@ func (err ArticleNotFoundError) Error() string {
 
 type ArticleInactiveError struct {
 	Name string
-	Id   int64
+	Id   ArticleID
 }
 
 func (err ArticleInactiveError) Error() string {
@@ -24,7 +31,7 @@ func (err ArticleInactiveError) Error() string {
 }
 
 type ArticleBarcodeAlreadyExistsError struct {
-	Id      int64
+	Id      ArticleID
 	Barcode string
 }
 
@@ -32,16 +39,25 @@ func (err ArticleBarcodeAlreadyExistsError) Error() string {
 	return fmt.Sprintf("Active article (%d) with barcode '%s' already exists.", err.Id, err.Barcode)
 }
 
+type Tag struct {
+	ID         TagID
+	Tag        string
+	Created    time.Time
+	UsageCount int64
+}
+
 type Barcode struct {
-	ID      int64
-	Barcode string
-	Created time.Time
+	ID        BarcodeID
+	ArticleID ArticleID
+	Barcode   string
+	Created   time.Time
 }
 
 type Article struct {
-	ID         int64
+	ID         ArticleID
 	Name       string
 	Barcodes   []Barcode
+	Tags       []Tag
 	Amount     int64
 	IsActive   bool
 	Created    time.Time
@@ -72,10 +88,44 @@ func (a Article) IsActivatable() bool {
 type ArticleRepository interface {
 	GetAll(bool, bool, string, *bool) ([]Article, error)
 	CountActive() (int, error)
-	FindById(context.Context, int64) (Article, error)
+	FindById(context.Context, ArticleID) (Article, error)
 	FindActiveByBarcode(string) (Article, error)
-	StoreArticle(context.Context, Article) (Article, error)
-	UpdateArticle(context.Context, Article) error
-	DeleteById(int64) error
+	Store(context.Context, Article) (Article, error)
+	Update(context.Context, Article) error
+	DeleteById(ArticleID) error
 	Transactional(context.Context, func(context.Context) error) error
+}
+
+type BarcodeRepository interface {
+	GetAll() ([]Barcode, error)
+	FindByArticleID(ArticleID) ([]Barcode, error)
+	FindByID(BarcodeID) (Barcode, error)
+	FindByBarcode(string) (Barcode, error)
+	ReassignBarcode(context.Context, BarcodeID, ArticleID) error
+	Store(Barcode) (Barcode, error)
+	DeleteByID(BarcodeID) error
+}
+
+type TagRepository interface {
+	GetAll() ([]Tag, error)
+	GetArticleTags(ArticleID) ([]Tag, error)
+	FindByID(TagID) (Tag, error)
+	FindByTag(string) (Tag, error)
+	CheckArticleHasTag(ArticleID, TagID) bool
+	Transactional(context.Context, func(context.Context) error) error
+	CreateTag(context.Context, string, time.Time) (Tag, error)
+	AddArticleTag(context.Context, ArticleID, TagID, time.Time) error
+}
+
+var (
+	ErrPersistanceError = errors.New("persistance error")
+)
+
+type BarcodeNotFoundError struct {
+	Identifier string
+	Cause      error
+}
+
+func (e BarcodeNotFoundError) Error() string {
+	return fmt.Sprintf("Barcode ID '%s' not found", e.Identifier)
 }

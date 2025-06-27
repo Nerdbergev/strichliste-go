@@ -2,30 +2,17 @@ package rest
 
 import (
 	"errors"
-	"fmt"
 	"net/http"
 	"strconv"
 	"time"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/render"
-	adomain "github.com/nerdbergev/strichliste-go/pkg/articles/domain"
-	"github.com/nerdbergev/strichliste-go/pkg/barcodes"
-	"github.com/nerdbergev/strichliste-go/pkg/barcodes/domain"
+	"github.com/nerdbergev/strichliste-go/pkg/articles/domain"
 )
 
-type Handler struct {
-	svc barcodes.Service
-}
-
-func NewHandler(svc barcodes.Service) Handler {
-	return Handler{
-		svc: svc,
-	}
-}
-
 func (h Handler) ListBarcodes(w http.ResponseWriter, r *http.Request) {
-	barcodes, err := h.svc.GetAll()
+	barcodes, err := h.svc.GetAllBarcodes()
 	if err != nil {
 		_ = render.Render(w, r, ErrServerError(err))
 		return
@@ -43,7 +30,7 @@ func (h Handler) ListArticleBarcodes(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	barcodes, err := h.svc.FindByArticleID(id)
+	barcodes, err := h.svc.FindBarcodeByArticleID(domain.ArticleID(id))
 	if err != nil {
 		_ = render.Render(w, r, ErrServerError(err))
 		return
@@ -60,7 +47,7 @@ func (h Handler) GetArticleBarcode(w http.ResponseWriter, r *http.Request) {
 		_ = render.Render(w, r, ErrInvalidParamter("bid"))
 		return
 	}
-	barcode, err := h.svc.FindByID(id)
+	barcode, err := h.svc.FindBarcodeByID(domain.BarcodeID(id))
 	if err != nil {
 		h.renderError(w, r, err)
 		return
@@ -101,7 +88,7 @@ func (h Handler) AddArticleBarcode(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	article, err := h.svc.AddArticleBarcode(aid, *bReq.Barcode)
+	article, err := h.svc.AddArticleBarcode(domain.ArticleID(aid), *bReq.Barcode)
 	if err != nil {
 		h.renderError(w, r, err)
 		return
@@ -124,7 +111,7 @@ func (h Handler) DeleteArticleBarcode(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	article, err := h.svc.DeleteArticleBarcode(aid, bid)
+	article, err := h.svc.DeleteArticleBarcode(domain.ArticleID(aid), domain.BarcodeID(bid))
 	if err != nil {
 		h.renderError(w, r, err)
 		return
@@ -168,11 +155,11 @@ type Barcode struct {
 	Created time.Time `json:"created"`
 }
 
-func MapBarcode(u domain.Barcode) Barcode {
+func MapBarcode(b domain.Barcode) Barcode {
 	resp := Barcode{
-		ID:      u.ID,
-		Barcode: u.Barcode,
-		Created: u.Created,
+		ID:      int64(b.ID),
+		Barcode: b.Barcode,
+		Created: b.Created,
 	}
 	return resp
 }
@@ -189,82 +176,82 @@ func (br BarcodeResponse) Render(w http.ResponseWriter, r *http.Request) error {
 	return nil
 }
 
-type Error struct {
-	Class   string `json:"class"`
-	Code    int    `json:"code"`
-	Message string `json:"message"`
-}
-
-type ErrResponse struct {
-	StatusCode int   `json:"-"`
-	Error      Error `json:"error"`
-}
-
-func (e *ErrResponse) Render(w http.ResponseWriter, r *http.Request) error {
-	render.Status(r, e.StatusCode)
-	return nil
-}
+// type Error struct {
+// 	Class   string `json:"class"`
+// 	Code    int    `json:"code"`
+// 	Message string `json:"message"`
+// }
+//
+// type ErrResponse struct {
+// 	StatusCode int   `json:"-"`
+// 	Error      Error `json:"error"`
+// }
+//
+// func (e *ErrResponse) Render(w http.ResponseWriter, r *http.Request) error {
+// 	render.Status(r, e.StatusCode)
+// 	return nil
+// }
 
 func ErrServerError(err error) render.Renderer {
 	return &ErrResponse{
-		StatusCode: http.StatusInternalServerError,
-		Error: Error{
-			Message: "Internal Server Error",
-			Code:    http.StatusInternalServerError,
-		},
+		HTTPStatusCode: http.StatusInternalServerError,
+		// Error: Error{
+		// 	Message: "Internal Server Error",
+		// 	Code:    http.StatusInternalServerError,
+		// },
 	}
 }
 
 func ErrInvalidParamter(name string) render.Renderer {
 	return &ErrResponse{
-		StatusCode: http.StatusBadRequest,
-		Error: Error{
-			Code:    http.StatusBadRequest,
-			Class:   "App\\Exception\\ParameterInvalidException",
-			Message: fmt.Sprintf("Parameter '%s' is invalid", name),
-		},
+		HTTPStatusCode: http.StatusBadRequest,
+		// Err: Error{
+		// 	Code:    http.StatusBadRequest,
+		// 	Class:   "App\\Exception\\ParameterInvalidException",
+		// 	Message: fmt.Sprintf("Parameter '%s' is invalid", name),
+		// },
 	}
 }
 
 func ErrBarcodeNotFound(err domain.BarcodeNotFoundError) render.Renderer {
 	return &ErrResponse{
-		StatusCode: http.StatusNotFound,
-		Error: Error{
-			Class:   "App\\Exception\\BarcodeNotFoundException",
-			Code:    http.StatusNotFound,
-			Message: err.Error(),
-		},
+		HTTPStatusCode: http.StatusNotFound,
+		// Error: Error{
+		// 	Class:   "App\\Exception\\BarcodeNotFoundException",
+		// 	Code:    http.StatusNotFound,
+		// 	Message: err.Error(),
+		// },
 	}
 }
 
-type Article struct {
-	ID         int64     `json:"id"`
-	Name       string    `json:"name"`
-	Barcodes   []Barcode `json:"barcodes"`
-	Amount     int64     `json:"amount"`
-	IsActive   bool      `json:"isActive"`
-	UsageCount int64     `json:"usageCount"`
-	Precursor  *Article  `json:"precursor"`
-	Created    time.Time `json:"created"`
-}
+// type Article struct {
+// 	ID         int64     `json:"id"`
+// 	Name       string    `json:"name"`
+// 	Barcodes   []Barcode `json:"barcodes"`
+// 	Amount     int64     `json:"amount"`
+// 	IsActive   bool      `json:"isActive"`
+// 	UsageCount int64     `json:"usageCount"`
+// 	Precursor  *Article  `json:"precursor"`
+// 	Created    time.Time `json:"created"`
+// }
+//
+// type ArticleResponse struct {
+// 	Article Article `json:"article"`
+// }
+//
+// func (ar ArticleResponse) Render(w http.ResponseWriter, r *http.Request) error {
+// 	return nil
+// }
+//
+// func NewArticleResponse(a adomain.Article) ArticleResponse {
+// 	return ArticleResponse{Article: mapArticle(a)}
+// }
 
-type ArticleResponse struct {
-	Article Article `json:"article"`
-}
-
-func (ar ArticleResponse) Render(w http.ResponseWriter, r *http.Request) error {
-	return nil
-}
-
-func NewArticleResponse(a adomain.Article) ArticleResponse {
-	return ArticleResponse{Article: mapArticle(a)}
-}
-
-func mapBarcodes(barcodes []adomain.Barcode) []Barcode {
+func mapBarcodes(barcodes []domain.Barcode) []Barcode {
 	mapped := make([]Barcode, 0, len(barcodes))
 	for _, b := range barcodes {
 		mapped = append(mapped, Barcode{
-			ID:      b.ID,
+			ID:      int64(b.ID),
 			Barcode: b.Barcode,
 			Created: b.Created,
 		})
@@ -272,20 +259,20 @@ func mapBarcodes(barcodes []adomain.Barcode) []Barcode {
 	return mapped
 }
 
-func mapArticle(a adomain.Article) Article {
-	resp := Article{
-		ID:         a.ID,
-		Name:       a.Name,
-		Amount:     a.Amount,
-		IsActive:   a.IsActive,
-		UsageCount: a.UsageCount,
-		Created:    a.Created,
-		Barcodes:   mapBarcodes(a.Barcodes),
-	}
-
-	if a.Precursor != nil {
-		resp.Precursor = new(Article)
-		*resp.Precursor = mapArticle(*a.Precursor)
-	}
-	return resp
-}
+// func mapArticle(a adomain.Article) Article {
+// 	resp := Article{
+// 		ID:         a.ID,
+// 		Name:       a.Name,
+// 		Amount:     a.Amount,
+// 		IsActive:   a.IsActive,
+// 		UsageCount: a.UsageCount,
+// 		Created:    a.Created,
+// 		Barcodes:   mapBarcodes(a.Barcodes),
+// 	}
+//
+// 	if a.Precursor != nil {
+// 		resp.Precursor = new(Article)
+// 		*resp.Precursor = mapArticle(*a.Precursor)
+// 	}
+// 	return resp
+// }

@@ -107,7 +107,7 @@ func mapBarcodes(barcodes []Barcode) []adomain.Barcode {
 	mapped := make([]adomain.Barcode, 0, len(barcodes))
 	for _, b := range barcodes {
 		mapped = append(mapped, adomain.Barcode{
-			ID:      b.ID.Int64,
+			ID:      adomain.BarcodeID(b.ID.Int64),
 			Barcode: b.Barcode.String,
 			Created: b.Created.Time,
 		})
@@ -117,7 +117,7 @@ func mapBarcodes(barcodes []Barcode) []adomain.Barcode {
 
 func mapArticleToDomain(a Article) *adomain.Article {
 	da := &adomain.Article{
-		ID:         a.ID,
+		ID:         adomain.ArticleID(a.ID),
 		Name:       a.Name,
 		Amount:     a.Amount,
 		IsActive:   a.IsActive,

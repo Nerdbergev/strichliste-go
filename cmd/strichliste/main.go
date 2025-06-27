@@ -20,16 +20,10 @@ import (
 	"github.com/nerdbergev/strichliste-go/pkg/articles"
 	arepo "github.com/nerdbergev/strichliste-go/pkg/articles/repository"
 	arest "github.com/nerdbergev/strichliste-go/pkg/articles/rest"
-	"github.com/nerdbergev/strichliste-go/pkg/barcodes"
-	brepo "github.com/nerdbergev/strichliste-go/pkg/barcodes/repository"
-	brest "github.com/nerdbergev/strichliste-go/pkg/barcodes/rest"
 	"github.com/nerdbergev/strichliste-go/pkg/metrics"
 	mrepo "github.com/nerdbergev/strichliste-go/pkg/metrics/repository"
 	mrest "github.com/nerdbergev/strichliste-go/pkg/metrics/rest"
 	"github.com/nerdbergev/strichliste-go/pkg/settings"
-	"github.com/nerdbergev/strichliste-go/pkg/tags"
-	tgrepo "github.com/nerdbergev/strichliste-go/pkg/tags/repository"
-	tgrest "github.com/nerdbergev/strichliste-go/pkg/tags/rest"
 	"github.com/nerdbergev/strichliste-go/pkg/transactions"
 	trepo "github.com/nerdbergev/strichliste-go/pkg/transactions/repository"
 	trest "github.com/nerdbergev/strichliste-go/pkg/transactions/rest"
@@ -83,10 +77,11 @@ func run(ctx context.Context, w io.Writer, args []string, getenv func(string) st
 	ss := settings.NewService(yml)
 	settingsHandler := settings.NewHandler(ss)
 
-	br := brepo.New(db)
+	br := arepo.NewBarcodeRepository(db)
 	tr := trepo.New(db)
 	ar := arepo.New(db)
-	asvc := articles.NewService(ar, tr, br)
+	tgr := arepo.NewTagRepository(db)
+	asvc := articles.NewService(ar, tr, br, tgr)
 	articlesHandler := arest.NewHandler(asvc)
 
 	ur := urepo.New(db)
@@ -103,12 +98,11 @@ func run(ctx context.Context, w io.Writer, args []string, getenv func(string) st
 	msvc := metrics.NewService(mr)
 	metricsHandler := mrest.NewHandler(msvc)
 
-	bsvc := barcodes.NewService(br, ar)
-	barcodesHandler := brest.NewHandler(bsvc)
+	// bsvc := barcodes.NewService(br, ar)
+	// barcodesHandler := brest.NewHandler(bsvc)
 
-	tgr := tgrepo.New(db)
-	tgsvc := tags.NewService(tgr, ar)
-	tagsHandler := tgrest.NewHandler(tgsvc)
+	// tgsvc := tags.NewService(tgr, ar)
+	// tagsHandler := tgrest.NewHandler(tgsvc)
 
 	trustedProxies := strings.Split(getenv("TRUSTED_PROXIES"), ",")
 	srv := NewServer(
@@ -117,8 +111,6 @@ func run(ctx context.Context, w io.Writer, args []string, getenv func(string) st
 		usersHandler,
 		transactionsHandler,
 		metricsHandler,
-		barcodesHandler,
-		tagsHandler,
 		trustedProxies,
 	)
 	httpServer := &http.Server{
@@ -151,8 +143,6 @@ func NewServer(
 	uh urest.Handler,
 	th trest.Handler,
 	mh mrest.Handler,
-	bh brest.Handler,
-	tgh tgrest.Handler,
 	trustedProxies []string,
 ) http.Handler {
 	r := chi.NewRouter()
@@ -175,8 +165,6 @@ func NewServer(
 		uh,
 		th,
 		mh,
-		bh,
-		tgh,
 	)
 
 	return r
@@ -189,14 +177,12 @@ func addRoutes(
 	uh urest.Handler,
 	th trest.Handler,
 	mh mrest.Handler,
-	bh brest.Handler,
-	tgh tgrest.Handler,
 ) {
 	router.Use(render.SetContentType(render.ContentTypeJSON))
 	router.Use(func(h http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			w.Header().Add("Access-Control-Allow-Origin", "*")
-			w.Header().Add("Access-Control-Allow-Methods", "GET, POST")
+			w.Header().Add("Access-Control-Allow-Methods", "GET, POST, DELETE")
 			w.Header().Add("Access-Control-Allow-Headers", "Content-Type")
 			if r.Method == http.MethodOptions {
 				w.WriteHeader(http.StatusOK)
@@ -221,16 +207,16 @@ func addRoutes(
 		router.Route("/article", func(router chi.Router) {
 			router.Get("/", ah.List)
 			router.Get("/{aid}", ah.FindById)
-			router.Get("/{articleId}/tag", tgh.ListArticleTags)
-			router.Get("/{articleId}/tag/{tagId}", tgh.GetArticleTag)
-			router.Post("/{articleId}/tag", tgh.AddArticleTag)
+			router.Get("/{articleId}/tag", ah.ListArticleTags)
+			router.Get("/{articleId}/tag/{tagId}", ah.GetArticleTag)
+			router.Post("/{articleId}/tag", ah.AddArticleTag)
 			router.Post("/", ah.CreateArticle)
 			router.Post("/{aid}", ah.UpdateArticle)
-			router.Post("/{aid}/barcode", bh.AddArticleBarcode)
+			router.Post("/{aid}/barcode", ah.AddArticleBarcode)
 			router.Delete("/{aid}", ah.DeactivateArticle)
-			router.Delete("/{aid}/barcode/{bid}", bh.DeleteArticleBarcode)
+			router.Delete("/{aid}/barcode/{bid}", ah.DeleteArticleBarcode)
 		})
 		router.Get("/metrics", mh.GetMetrics)
-		router.Get("/tag", tgh.ListTags)
+		router.Get("/tag", ah.ListTags)
 	})
 }

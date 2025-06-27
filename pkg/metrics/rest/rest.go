@@ -164,7 +164,7 @@ func MapArticles(articles []adomain.Article) []Article {
 
 func MapArticle(article adomain.Article) Article {
 	resp := Article{
-		ID:         article.ID,
+		ID:         int64(article.ID),
 		Name:       article.Name,
 		Amount:     article.Amount,
 		IsActive:   article.IsActive,
@@ -174,7 +174,7 @@ func MapArticle(article adomain.Article) Article {
 
 	for _, bc := range article.Barcodes {
 		resp.Barcodes = append(resp.Barcodes, Barcode{
-			ID:      bc.ID,
+			ID:      int64(bc.ID),
 			Barcode: bc.Barcode,
 			Created: bc.Created,
 		})

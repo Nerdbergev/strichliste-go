@@ -156,7 +156,7 @@ type Article struct {
 
 func mapArticleToDomain(a Article) adomain.Article {
 	da := adomain.Article{
-		ID:         a.ID,
+		ID:         adomain.ArticleID(a.ID),
 		Name:       a.Name,
 		Amount:     a.Amount,
 		IsActive:   a.IsActive,
@@ -165,7 +165,7 @@ func mapArticleToDomain(a Article) adomain.Article {
 	}
 	for _, b := range a.Barcodes {
 		da.Barcodes = append(da.Barcodes, adomain.Barcode{
-			ID:      b.ID.Int64,
+			ID:      adomain.BarcodeID(b.ID.Int64),
 			Barcode: b.Barcode.String,
 			Created: b.Created.Time,
 		})

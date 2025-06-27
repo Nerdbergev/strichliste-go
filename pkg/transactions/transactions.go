@@ -63,7 +63,7 @@ func (svc Service) ProcessTransaction(uid, amount int64, comment *string, quanti
 
 		var article adomain.Article
 		if articleID != nil {
-			article, err = svc.arepo.FindById(ctx, *articleID)
+			article, err = svc.arepo.FindById(ctx, adomain.ArticleID(*articleID))
 			if err != nil {
 				return err
 			}
@@ -78,7 +78,7 @@ func (svc Service) ProcessTransaction(uid, amount int64, comment *string, quanti
 			t.Quantity = quantity
 			amount = article.Amount * *t.Quantity * -1
 			article.IncrementUsageCount()
-			if err := svc.arepo.UpdateArticle(ctx, article); err != nil {
+			if err := svc.arepo.Update(ctx, article); err != nil {
 				return err
 			}
 		}
@@ -162,7 +162,7 @@ func (svc Service) RevertTransaction(tid int64) (domain.Transaction, error) {
 
 		if toRevert.Article != nil {
 			toRevert.Article.DecrementUsageCount()
-			if err := svc.arepo.UpdateArticle(ctx, *toRevert.Article); err != nil {
+			if err := svc.arepo.Update(ctx, *toRevert.Article); err != nil {
 				return err
 			}
 		}
