@@ -215,6 +215,7 @@ func addRoutes(
 			router.Post("/{aid}/barcode", ah.AddArticleBarcode)
 			router.Delete("/{aid}", ah.DeactivateArticle)
 			router.Delete("/{aid}/barcode/{bid}", ah.DeleteArticleBarcode)
+			router.Delete("/{articleId}/tag/{tagId}", ah.DeleteArticleTag)
 		})
 		router.Get("/metrics", mh.GetMetrics)
 		router.Get("/tag", ah.ListTags)

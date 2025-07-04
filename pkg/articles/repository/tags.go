@@ -134,6 +134,16 @@ func (r TagRepository) AddArticleTag(ctx context.Context, aid domain.ArticleID, 
 	return err
 }
 
+func (r TagRepository) DeleteArticleTag(ctx context.Context, aid domain.ArticleID, tid domain.TagID) error {
+	_, err := r.getDB(ctx).Exec("DELETE FROM article_tag WHERE article_id = ? and tag_id = ?", aid, tid)
+	return err
+}
+
+func (r TagRepository) DeleteTag(ctx context.Context, tid domain.TagID) error {
+	_, err := r.getDB(ctx).Exec("DELETE FROM tag WHERE id = ?", tid)
+	return err
+}
+
 func (r TagRepository) getDB(ctx context.Context) database.DB {
 	if db, ok := database.FromContext(ctx); ok {
 		return db

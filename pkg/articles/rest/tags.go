@@ -80,27 +80,28 @@ func (h Handler) AddArticleTag(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-// func (h Handler) renderError(w http.ResponseWriter, r *http.Request, err error) {
-// 	// var (
-// 	// 	unfErr domain.UserNotFoundError
-// 	// 	aeErr  domain.UserAlreadyExistsError
-// 	// 	pmErr  ParameterMissingError
-// 	// 	piErr  ParameterInvalidError
-// 	// )
-//
-// 	switch {
-// 	// case errors.As(err, &unfErr):
-// 	// 	_ = render.Render(w, r, ErrUserNotFound(unfErr))
-// 	// case errors.As(err, &aeErr):
-// 	// 	_ = render.Render(w, r, ErrUserAlreadyExists(aeErr))
-// 	// case errors.As(err, &pmErr):
-// 	// 	_ = render.Render(w, r, ErrMissingParameter(pmErr.Name))
-// 	// case errors.As(err, &piErr):
-// 	// 	_ = render.Render(w, r, ErrInvalidParamter(piErr.Name))
-// 	default:
-// 		_ = render.Render(w, r, ErrServerError(err))
-// 	}
-// }
+func (h Handler) DeleteArticleTag(w http.ResponseWriter, r *http.Request) {
+	aid, err := strconv.ParseInt(chi.URLParam(r, "articleId"), 10, 64)
+	if err != nil {
+		h.renderError(w, r, err)
+		return
+	}
+
+	tid, err := strconv.ParseInt(chi.URLParam(r, "tagId"), 10, 64)
+	if err != nil {
+		h.renderError(w, r, err)
+		return
+	}
+	article, err := h.svc.DeleteArticleTag(domain.ArticleID(aid), domain.TagID(tid))
+	if err != nil {
+		h.renderError(w, r, err)
+		return
+	}
+	if err := render.Render(w, r, NewArticleResponse(article)); err != nil {
+		_ = render.Render(w, r, ErrServerError(err))
+		return
+	}
+}
 
 type TagRequest struct {
 	TagParam string `json:"tag"`
@@ -161,87 +162,3 @@ type Tag struct {
 	Created    time.Time `json:"created"`
 	UsageCount int64     `json:"usageCount"`
 }
-
-// type Error struct {
-// 	Class   string `json:"class"`
-// 	Code    int    `json:"code"`
-// 	Message string `json:"message"`
-// }
-//
-// type ErrResponse struct {
-// 	StatusCode int   `json:"-"`
-// 	Error      Error `json:"error"`
-// }
-//
-// func (e *ErrResponse) Render(w http.ResponseWriter, r *http.Request) error {
-// 	render.Status(r, e.StatusCode)
-// 	return nil
-// }
-//
-// func ErrServerError(err error) render.Renderer {
-// 	return &ErrResponse{
-// 		Error: Error{
-// 			Message: "Internal Server Error",
-// 			Code:    http.StatusInternalServerError,
-// 		},
-// 	}
-// }
-
-// type ArticleResponse struct {
-// 	Article Article `json:"article"`
-// }
-//
-// func (ar ArticleResponse) Render(w http.ResponseWriter, r *http.Request) error {
-// 	return nil
-// }
-//
-// func NewArticleResponse(a adomain.Article) ArticleResponse {
-// 	return ArticleResponse{Article: mapArticle(a)}
-// }
-//
-// type Barcode struct {
-// 	ID      int64     `json:"id"`
-// 	Barcode string    `json:"barcode"`
-// 	Created time.Time `json:"created"`
-// }
-//
-// type Article struct {
-// 	ID         int64     `json:"id"`
-// 	Name       string    `json:"name"`
-// 	Barcodes   []Barcode `json:"barcodes"`
-// 	Amount     int64     `json:"amount"`
-// 	IsActive   bool      `json:"isActive"`
-// 	UsageCount int64     `json:"usageCount"`
-// 	Precursor  *Article  `json:"precursor"`
-// 	Created    time.Time `json:"created"`
-// }
-//
-// func mapBarcodes(barcodes []adomain.Barcode) []Barcode {
-// 	mapped := make([]Barcode, 0, len(barcodes))
-// 	for _, b := range barcodes {
-// 		mapped = append(mapped, Barcode{
-// 			ID:      b.ID,
-// 			Barcode: b.Barcode,
-// 			Created: b.Created,
-// 		})
-// 	}
-// 	return mapped
-// }
-//
-// func mapArticle(a adomain.Article) Article {
-// 	resp := Article{
-// 		ID:         a.ID,
-// 		Name:       a.Name,
-// 		Amount:     a.Amount,
-// 		IsActive:   a.IsActive,
-// 		UsageCount: a.UsageCount,
-// 		Created:    a.Created,
-// 		Barcodes:   mapBarcodes(a.Barcodes),
-// 	}
-//
-// 	if a.Precursor != nil {
-// 		resp.Precursor = new(Article)
-// 		*resp.Precursor = mapArticle(*a.Precursor)
-// 	}
-// 	return resp
-// }

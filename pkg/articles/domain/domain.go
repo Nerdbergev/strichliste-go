@@ -115,6 +115,8 @@ type TagRepository interface {
 	Transactional(context.Context, func(context.Context) error) error
 	CreateTag(context.Context, string, time.Time) (Tag, error)
 	AddArticleTag(context.Context, ArticleID, TagID, time.Time) error
+	DeleteArticleTag(context.Context, ArticleID, TagID) error
+	DeleteTag(context.Context, TagID) error
 }
 
 var (

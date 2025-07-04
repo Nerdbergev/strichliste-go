@@ -79,3 +79,30 @@ func (svc Service) AddArticleTag(aid domain.ArticleID, tag string) (domain.Artic
 
 	return article, nil
 }
+
+func (svc Service) DeleteArticleTag(aid domain.ArticleID, tid domain.TagID) (domain.Article, error) {
+	tag, err := svc.tagrepo.FindByID(tid)
+	if err != nil {
+		return domain.Article{}, err
+	}
+
+	err = svc.tagrepo.Transactional(context.Background(), func(ctx context.Context) error {
+		err := svc.tagrepo.DeleteArticleTag(ctx, aid, tid)
+		if err != nil {
+			return err
+		}
+
+		if tag.UsageCount == 1 {
+			err := svc.tagrepo.DeleteTag(ctx, tid)
+			if err != nil {
+				return err
+			}
+		}
+		return nil
+	})
+	if err != nil {
+		return domain.Article{}, err
+	}
+
+	return svc.FindById(aid)
+}
